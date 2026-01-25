@@ -1,12 +1,12 @@
-aiogram==3.10.0
-aiohttp==3.9.3
-requests==2.31.0
-psycopg2-binary==2.9.9 
-sqlite3 
-flask==3.0.0
-gunicorn==21.2.0 
-python-dotenv==1.0.0
-pytz==2023.3.post1
-schedule==1.2.0
-colorlog==6.7.0
-asyncio
+# Railway оптимизированные зависимости
+aiogram==3.10.0  # Фреймворк для Telegram бота
+aiohttp==3.9.3  # HTTP клиент/сервер
+requests==2.31.0  # HTTP запросы
+psycopg2-binary==2.9.9  # PostgreSQL драйвер
+flask==3.0.0  # Веб-сервер для health checks
+python-dotenv==1.0.0  # Переменные окружения
+pytz==2023.3.post1  # Часовые пояса
+
+# ======== ЗАМЕНА ДЛЯ ASYNCIO ========
+# Вместо стандартного asyncio для совместимости
+async-timeout==4.0.3
