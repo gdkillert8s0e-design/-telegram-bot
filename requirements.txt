@@ -1,6 +1,5 @@
-# Создайте новый requirements.txt без sqlite3
-echo "aiogram==3.10.0
+aiogram==3.10.0
 aiohttp==3.9.3
 requests==2.31.0
 psycopg2-binary==2.9.9
-flask==3.0.0" > requirements.txt
+flask==3.0.0
