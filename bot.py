@@ -261,7 +261,7 @@ async def cmd_start(message: types.Message):
         stars = result[0] if result else 0
 
         await message.answer(
-            f"<b>🎁 Добро пожаловать в OneGifts!</b>\n\n"
+            f"<b>🎁 Добро пожаловать в Vitcoin gifts!</b>\n\n"
             f"✨ <b>Твои звёзды:</b> {stars}\n\n"
             f"🎰 <b>Открывай подарочки за 30 звезд!</b>\n"
             f"🎁 <b>Бесплатный NFT подарок раз в 24 часа с шансом 0.001%!</b>\n\n"
@@ -276,11 +276,7 @@ async def cmd_start(message: types.Message):
         logger.error(f"Ошибка при обработке /start: {e}")
         await message.answer("❌ Произошла ошибка. Попробуйте позже.")
 
-# Убрал обработчик команды /help - ничего не показываем
-@dp.message(Command("help"))
-async def cmd_help(message: types.Message):
-    # Просто игнорируем команду /help
-    pass
+# Убрали обработчик команды /help - она больше не обрабатывается
 
 # ========== ОБРАБОТЧИКИ КОЛБЭКОВ ==========
 
@@ -461,7 +457,7 @@ async def free_nft_gift(callback: types.CallbackQuery):
                     f"✨ <b>Твои звёзды:</b> {current_stars}\n"
                     f"🎒 <b>NFT добавлен в ваш инвентарь!</b>\n"
                     f"🕐 <b>Следующий бесплатный NFT подарок через 24 часа</b>\n\n"
-                    f"<i>Админ сам вам отпишет при выводе!</i>",
+                    f"<i>Можете вывести NFT в разделе 'Инвентарь'</i>",
                     reply_markup=get_main_menu_keyboard(user_id),
                     parse_mode="HTML"
                 )
@@ -674,30 +670,41 @@ async def inventory(callback: types.CallbackQuery):
     try:
         # Получаем ВСЕ активные подарки пользователя
         cursor.execute('''
-            SELECT gift_emoji, gift_name, gift_value 
+            SELECT id, gift_emoji, gift_name, gift_value 
             FROM user_gifts 
             WHERE user_id = ? AND status = 'active'
-            ORDER BY gift_name, timestamp DESC
+            ORDER BY CASE 
+                WHEN gift_name = 'NFT' THEN 1
+                ELSE 2
+            END, gift_name, timestamp DESC
         ''', (user_id,))
 
         gifts = cursor.fetchall()
 
         # Считаем количество каждого типа подарка
         gift_counts = {}
-        for emoji, name, value in gifts:
-            key = f"{emoji} {name}"
-            if key in gift_counts:
-                gift_counts[key]["count"] += 1
+        nft_count = 0
+        
+        for gift_id, emoji, name, value in gifts:
+            if name == "NFT":
+                nft_count += 1
             else:
-                gift_counts[key] = {"emoji": emoji, "name": name, "value": value, "count": 1}
+                key = f"{emoji} {name}"
+                if key in gift_counts:
+                    gift_counts[key]["count"] += 1
+                    gift_counts[key]["ids"].append(gift_id)
+                else:
+                    gift_counts[key] = {"emoji": emoji, "name": name, "value": value, "count": 1, "ids": [gift_id]}
 
-        # Получаем NFT пользователя отдельно
+        # Получаем NFT отдельно
         cursor.execute('''
-            SELECT COUNT(*) FROM user_gifts 
+            SELECT id FROM user_gifts 
             WHERE user_id = ? AND status = 'active' AND gift_name = 'NFT'
+            ORDER BY timestamp DESC
         ''', (user_id,))
-        nft_result = cursor.fetchone()
-        nft_count = nft_result[0] if nft_result else 0
+        
+        nft_gifts = cursor.fetchall()
+        nft_ids = [nft[0] for nft in nft_gifts]
 
         keyboard = InlineKeyboardBuilder()
 
@@ -710,46 +717,36 @@ async def inventory(callback: types.CallbackQuery):
             inventory_text = "<b>🎁 Ваши подарки (нажмите для вывода):</b>\n"
             total_gift_count = len(gifts)
 
-            # Создаем кнопки для ВСЕХ отдельных подарков
-            cursor.execute('''
-                SELECT id, gift_emoji, gift_name, gift_value 
-                FROM user_gifts 
-                WHERE user_id = ? AND status = 'active'
-                ORDER BY CASE WHEN gift_name = 'NFT' THEN 1 ELSE 2 END, timestamp DESC
-            ''', (user_id,))
-
-            all_gifts = cursor.fetchall()
-            
-            # Сначала показываем список с количеством (исключая NFT из общего списка)
-            regular_gifts_counts = {}
+            # Показываем обычные подарки с количеством
             for gift_info in gift_counts.values():
-                if gift_info["name"] != "NFT":  # Исключаем NFT из этого списка
-                    inventory_text += f"{gift_info['emoji']} {gift_info['name']}: {gift_info['value']}⭐ (x{gift_info['count']})\n"
-                    regular_gifts_counts[gift_info["name"]] = gift_info["count"]
+                inventory_text += f"{gift_info['emoji']} {gift_info['name']}: {gift_info['value']}⭐ (x{gift_info['count']})\n"
             
-            # Отдельно показываем NFT
+            # Показываем NFT отдельно
             if nft_count > 0:
-                inventory_text += f"\n<b>💎 NFT:</b> {nft_count} шт. (1000⭐ каждый)\n"
+                inventory_text += f"\n💎 <b>NFT:</b> {nft_count} шт. (1000⭐ каждый)\n"
             
-            # Теперь добавляем кнопки для каждого подарка отдельно
-            for gift_id, emoji, name, value in all_gifts:
-                # Для обычных подарков показываем номер
-                if name != "NFT":
-                    # Находим номер этого подарка среди одинаковых
-                    cursor.execute('''
-                        SELECT COUNT(*) FROM user_gifts 
-                        WHERE user_id = ? AND status = 'active' AND gift_name = ? AND id <= ?
-                    ''', (user_id, name, gift_id))
-                    gift_number = cursor.fetchone()[0]
-                    keyboard.row(InlineKeyboardButton(
-                        text=f"📤 Вывести {emoji} {name} #{gift_number} ({value}⭐)",
-                        callback_data=f"withdraw_gift_{gift_id}"
-                    ))
+            # Добавляем кнопки для обычных подарков
+            for gift_info in gift_counts.values():
+                if gift_info["count"] > 1:
+                    # Для нескольких одинаковых подарков создаем кнопки для каждого
+                    for i, gift_id in enumerate(gift_info["ids"], 1):
+                        keyboard.row(InlineKeyboardButton(
+                            text=f"📤 Вывести {gift_info['emoji']} {gift_info['name']} #{i} ({gift_info['value']}⭐)",
+                            callback_data=f"withdraw_gift_{gift_id}"
+                        ))
                 else:
-                    # Для NFT показываем просто NFT
+                    # Для одного подарка
                     keyboard.row(InlineKeyboardButton(
-                        text=f"📤 Вывести {emoji} {name} (1000⭐)",
-                        callback_data=f"withdraw_gift_{gift_id}"
+                        text=f"📤 Вывести {gift_info['emoji']} {gift_info['name']} ({gift_info['value']}⭐)",
+                        callback_data=f"withdraw_gift_{gift_info['ids'][0]}"
+                    ))
+            
+            # Добавляем кнопки для NFT
+            if nft_count > 0:
+                for i, nft_id in enumerate(nft_ids, 1):
+                    keyboard.row(InlineKeyboardButton(
+                        text=f"📤 Вывести 💎 NFT #{i} (1000⭐)",
+                        callback_data=f"withdraw_gift_{nft_id}"
                     ))
 
             inventory_text += f"\n<b>📊 Всего предметов:</b> {total_gift_count}"
@@ -852,7 +849,7 @@ async def nft_cells(callback: types.CallbackQuery):
         "<b>💎 NFT ячейки</b>\n\n"
         "🎯 <b>Откройте ячейку с шансом получить NFT:</b>\n"
         "• NFT = 1000 звезд (добавляется в инвентарь)\n"
-        "• Админ сам напишет при выводе\n\n"
+        "• Можете вывести NFT через раздел 'Инвентарь'\n\n"
         "💰 <b>Выберите ячейку:</b>",
         reply_markup=keyboard.as_markup(),
         parse_mode="HTML"
@@ -952,7 +949,7 @@ async def open_nft_cell(callback: types.CallbackQuery):
         cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
         final_stars = cursor.fetchone()[0]
 
-        nft_note = "\n\n<i>NFT добавлен в инвентарь. Админ сам вам отпишет при выводе!</i>" if is_nft_win else ""
+        nft_note = "\n\n<i>NFT добавлен в инвентарь. Можете вывести его в разделе 'Инвентарь'!</i>" if is_nft_win else ""
 
         keyboard = InlineKeyboardBuilder()
         keyboard.row(InlineKeyboardButton(text="💎 Открыть ещё ячейку", callback_data="nft_cells"))
