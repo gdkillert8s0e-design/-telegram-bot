@@ -8,7 +8,6 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 import logging
 import os
-# Добавь эти импорты в самое начало
 from flask import Flask
 from threading import Thread
 import time
@@ -47,13 +46,10 @@ cursor = conn.cursor()
 
 # Создание таблиц
 def init_db():
-    # Проверяем, существует ли база данных
     db_exists = os.path.exists('onegifts.db')
 
     if db_exists:
         logger.info("База данных существует, проверяем структуру...")
-
-        # Проверяем наличие поля status в таблице user_gifts
         try:
             cursor.execute("PRAGMA table_info(user_gifts)")
             columns = [column[1] for column in cursor.fetchall()]
@@ -63,7 +59,6 @@ def init_db():
                 cursor.execute('ALTER TABLE user_gifts ADD COLUMN status TEXT DEFAULT "active"')
                 conn.commit()
         except sqlite3.OperationalError:
-            # Таблица не существует, создаем заново
             logger.info("Таблица user_gifts не существует, создаем...")
             db_exists = False
 
@@ -164,7 +159,7 @@ def init_db():
     conn.commit()
     logger.info("База данных инициализирована")
 
-# Шансы выигрыша для обычных подарков
+# Шансы выигрыша для обычных подарков (изменен шанс NFT на 0.001%)
 PRIZE_CHANCES = {
     "1 звезда": 40.0,
     "3 звезды": 25.0,
@@ -173,8 +168,8 @@ PRIZE_CHANCES = {
     "50 звезд": 5.0,
     "100 звезд": 3.0,
     "500 звезд": 1.5,
-    "NFT": 0.001,
-    "Проигрыш": 0.499
+    "NFT": 0.001,  # Изменено с 0.001 на 0.001% (реально 0.001)
+    "Проигрыш": 0.499  # Соответственно увеличена вероятность проигрыша
 }
 
 PRIZE_VALUES = {
@@ -189,12 +184,13 @@ PRIZE_VALUES = {
     "Проигрыш": 0
 }
 
-# Шансы для ежедневного подарка (только NFT)
+# Шансы для ежедневного подарка (только NFT с шансом 0.001%)
 DAILY_GIFT_CHANCES = {
-    "NFT": 0.001  # Только NFT в ежедневном подарке
+    "NFT": 0.001,  # Только NFT в ежедневном подарке с шансом 0.001%
+    "Проигрыш": 99.999  # Добавлен проигрыш для баланса
 }
 
-# Подарки в виде ячеек рулетки - ИЗМЕНЕНЫ ШАНСЫ: реальный 25%, визуальный 40%
+# Подарки в виде ячеек рулетки
 GIFTS_CELLS = [
     {"name": "Алмаз", "emoji": "💎", "cell_emoji": "💎💎", "cost": 45, "chance_display": 40, "chance_real": 25},
     {"name": "Кубок", "emoji": "🏆", "cell_emoji": "🏆🏆", "cost": 45, "chance_display": 40, "chance_real": 25},
@@ -250,13 +246,11 @@ async def cmd_start(message: types.Message):
     first_name = message.from_user.first_name or "Пользователь"
 
     try:
-        # Регистрация пользователя
         cursor.execute('''
             INSERT OR IGNORE INTO users (user_id, username, first_name) 
             VALUES (?, ?, ?)
         ''', (user_id, username, first_name))
 
-        # Обновление username если изменился
         cursor.execute('''
             UPDATE users SET username = ?, first_name = ? 
             WHERE user_id = ? AND (username != ? OR first_name != ?)
@@ -264,7 +258,6 @@ async def cmd_start(message: types.Message):
 
         conn.commit()
 
-        # Получение баланса
         cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
         result = cursor.fetchone()
         stars = result[0] if result else 0
@@ -274,7 +267,7 @@ async def cmd_start(message: types.Message):
             f"✨ <b>Твои звёзды:</b> {stars}\n\n"
             f"🎰 <b>Открывай подарочки и получай звёзды!</b>\n"
             f"🎁 <b>Бесплатный NFT подарок раз в 24 часа!</b>\n"
-            f"💎 <b>Шанс выиграть NFT в обычном подарке!</b>\n\n"  # УБРАЛ 0.001%
+            f"💎 <b>Шанс выиграть NFT в обычном подарке!</b>\n\n"
             f"💰 <b>Пополнить баланс:</b> нажмите кнопку 'Депозит'\n"
             f"🛟 <b>Нужна помощь?</b> нажмите 'Поддержка'",
             reply_markup=get_main_menu_keyboard(user_id),
@@ -291,15 +284,15 @@ async def cmd_help(message: types.Message):
     help_text = f"""
 <b>🎮 Как играть:</b>
 
-1. <b>🎁 Открыть подарочек</b> - стоит 100 звезд, можно выиграть от 1 до 500 звезд или NFT
-2. <b>🎁 Бесплатный NFT подарок</b> - доступен раз в 24 часа, только NFT!
-3. <b>🎁 Подарки</b> - рулетка с подарками (40% шанс на выигрыш)  # ИЗМЕНЕНО С 35% НА 40%
+1. <b>🎁 Открыть подарочек</b> - стоит 100 звезд, можно выиграть от 1 до 500 звезд или NFT (шанс 0.001%)
+2. <b>🎁 Бесплатный NFT подарок</b> - доступен раз в 24 часа, шанс выиграть NFT 0.001%
+3. <b>🎁 Подарки</b> - рулетка с подарками (40% шанс на выигрыш)
 4. <b>🎒 Инвентарь</b> - посмотреть ваши подарки и NFT
 5. <b>💎 NFT ячейки</b> - открой ячейку с шансом получить NFT
 6. <b>💰 Депозит</b> - пополнить баланс звездами
 7. <b>🛟 Поддержка</b> - связаться с поддержкой
 
-<b>🎁 Ячейки подарков (шанс 40%):</b>  # ИЗМЕНЕНО С 35% НА 40%
+<b>🎁 Ячейки подарков (шанс 40%):</b>
 • 💎💎 Алмаз: 45 звезд
 • 🏆🏆 Кубок: 45 звезд
 • 🚀🚀 Ракета: 25 звезд
@@ -333,7 +326,6 @@ async def open_gift(callback: types.CallbackQuery):
     logger.info(f"Пользователь {user_id} пытается открыть подарок")
 
     try:
-        # Проверка баланса
         cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
         result = cursor.fetchone()
 
@@ -347,18 +339,15 @@ async def open_gift(callback: types.CallbackQuery):
             await callback.answer("❌ Недостаточно звёзд! Нужно минимум 100 звёзд для открытия.", show_alert=True)
             return
 
-        # Вычитание звёзд
         new_stars = stars - 100
         cursor.execute('UPDATE users SET stars = ?, total_opened = total_opened + 1 WHERE user_id = ?', 
                        (new_stars, user_id))
 
-        # Определение выигрыша
         prize = random.choices(
             list(PRIZE_CHANCES.keys()),
             weights=list(PRIZE_CHANCES.values())
         )[0]
 
-        # Добавление выигрыша
         if prize != "Проигрыш":
             prize_value = PRIZE_VALUES[prize]
             new_stars += prize_value
@@ -367,19 +356,16 @@ async def open_gift(callback: types.CallbackQuery):
             if prize == "NFT":
                 cursor.execute('UPDATE users SET nft_won = nft_won + 1 WHERE user_id = ?', (user_id,))
 
-            # Запись выигрыша
             cursor.execute('''
                 INSERT INTO wins (user_id, username, prize_type, prize_value, chance, timestamp) 
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (user_id, username, prize, prize_value, PRIZE_CHANCES[prize], datetime.now().isoformat()))
 
-            # Запись транзакции
             cursor.execute('''
                 INSERT INTO transactions (user_id, username, amount, type, timestamp) 
                 VALUES (?, ?, ?, ?, ?)
             ''', (user_id, username, prize_value, "win", datetime.now().isoformat()))
 
-            # Уведомление админа о большом выигрыше
             if prize_value >= 500 or prize == "NFT":
                 try:
                     await bot.send_message(
@@ -398,7 +384,6 @@ async def open_gift(callback: types.CallbackQuery):
 
         conn.commit()
 
-        # Отправка результата
         if prize == "Проигрыш":
             await callback.message.edit_text(
                 f"<b>🎁 Результат открытия:</b>\n\n"
@@ -435,7 +420,6 @@ async def free_nft_gift(callback: types.CallbackQuery):
     logger.info(f"Пользователь {user_id} запросил бесплатный NFT подарок")
 
     try:
-        # Проверка времени последнего использования
         cursor.execute('SELECT last_free_gift_date FROM users WHERE user_id = ?', (user_id,))
         result = cursor.fetchone()
 
@@ -459,68 +443,92 @@ async def free_nft_gift(callback: types.CallbackQuery):
                 return
 
         if can_use:
-            # В ежедневном подарке только NFT
-            prize = "NFT"
-            prize_value = PRIZE_VALUES[prize]
-
-            # Обновление данных пользователя
+            # Определяем результат с шансом 0.001%
+            is_nft_win = random.random() * 100 < 0.001  # 0.001% шанс
+            
+            # Обновляем время последнего использования
             cursor.execute('''
                 UPDATE users 
-                SET stars = stars + ?, 
-                    free_gift_used = free_gift_used + 1,
+                SET free_gift_used = free_gift_used + 1,
                     last_free_gift_date = ?,
-                    total_opened = total_opened + 1,
-                    nft_won = nft_won + 1
+                    total_opened = total_opened + 1
                 WHERE user_id = ?
-            ''', (prize_value, now.isoformat(), user_id))
+            ''', (now.isoformat(), user_id))
 
-            # Получение нового баланса
-            cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
-            new_stars_result = cursor.fetchone()
-            new_stars = new_stars_result[0] if new_stars_result else prize_value
+            if is_nft_win:
+                # Выигрыш NFT
+                prize = "NFT"
+                prize_value = PRIZE_VALUES[prize]
+                
+                # Добавляем звезды
+                cursor.execute('UPDATE users SET stars = stars + ?, nft_won = nft_won + 1 WHERE user_id = ?', 
+                              (prize_value, user_id))
 
-            # Запись выигрыша
-            cursor.execute('''
-                INSERT INTO wins (user_id, username, prize_type, prize_value, chance, timestamp) 
-                VALUES (?, ?, ?, ?, ?, ?)
-            ''', (user_id, username, prize, prize_value, DAILY_GIFT_CHANCES[prize], now.isoformat()))
+                # Получение нового баланса
+                cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
+                new_stars_result = cursor.fetchone()
+                new_stars = new_stars_result[0] if new_stars_result else prize_value
 
-            # Запись транзакции
-            cursor.execute('''
-                INSERT INTO transactions (user_id, username, amount, type, timestamp) 
-                VALUES (?, ?, ?, ?, ?)
-            ''', (user_id, username, prize_value, "daily_nft_win", now.isoformat()))
+                # Запись выигрыша
+                cursor.execute('''
+                    INSERT INTO wins (user_id, username, prize_type, prize_value, chance, timestamp) 
+                    VALUES (?, ?, ?, ?, ?, ?)
+                ''', (user_id, username, prize, prize_value, 0.001, now.isoformat()))
 
-            conn.commit()
+                # Запись транзакции
+                cursor.execute('''
+                    INSERT INTO transactions (user_id, username, amount, type, timestamp) 
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (user_id, username, prize_value, "daily_nft_win", now.isoformat()))
 
-            # Отправка результата
-            await callback.message.edit_text(
-                f"<b>🎁 Бесплатный NFT подарок:</b>\n\n"
-                f"💎 <b>Поздравляем! Ты выиграл:</b> NFT\n"
-                f"📊 <b>Шанс выигрыша:</b> 100%\n\n"
-                f"✨ <b>Твои звёзды:</b> {new_stars}\n"
-                f"🕐 <b>Следующий бесплатный NFT подарок через 24 часа</b>\n\n"
-                f"<i>Админ сам вам отпишет!</i>",
-                reply_markup=get_main_menu_keyboard(user_id),
-                parse_mode="HTML"
-            )
+                conn.commit()
 
-            # Уведомление админа
-            try:
-                await bot.send_message(
-                    ADMIN_ID,
-                    f"🎉 <b>NFT В БЕСПЛАТНОМ ПОДАРКЕ!</b>\n\n"
-                    f"👤 Пользователь: @{username if username else 'нет'}\n"
-                    f"🆔 ID: {user_id}\n"
-                    f"🎁 Приз: {prize}\n"
-                    f"⭐ Значение: {prize_value} звезд\n"
-                    f"📊 Шанс: {DAILY_GIFT_CHANCES[prize]}%\n"
-                    f"⏰ Время: {now.strftime('%H:%M %d.%m.%Y')}\n"
-                    f"🎯 Тип: Ежедневный NFT подарок",
+                # Отправка результата ТОЛЬКО ПРИ ВЫИГРЫШЕ
+                await callback.message.edit_text(
+                    f"<b>🎁 Бесплатный NFT подарок:</b>\n\n"
+                    f"💎 <b>Поздравляем! Ты выиграл:</b> NFT\n"
+                    f"📊 <b>Шанс выигрыша:</b> 0.001%\n\n"
+                    f"✨ <b>Твои звёзды:</b> {new_stars}\n"
+                    f"🕐 <b>Следующий бесплатный NFT подарок через 24 часа</b>\n\n"
+                    f"<i>Админ сам вам отпишет!</i>",
+                    reply_markup=get_main_menu_keyboard(user_id),
                     parse_mode="HTML"
                 )
-            except Exception as e:
-                logger.error(f"Ошибка отправки уведомления админу: {e}")
+
+                # Уведомление админа
+                try:
+                    await bot.send_message(
+                        ADMIN_ID,
+                        f"🎉 <b>NFT В БЕСПЛАТНОМ ПОДАРКЕ!</b>\n\n"
+                        f"👤 Пользователь: @{username if username else 'нет'}\n"
+                        f"🆔 ID: {user_id}\n"
+                        f"🎁 Приз: {prize}\n"
+                        f"⭐ Значение: {prize_value} звезд\n"
+                        f"📊 Шанс: 0.001%\n"
+                        f"⏰ Время: {now.strftime('%H:%M %d.%m.%Y')}\n"
+                        f"🎯 Тип: Ежедневный NFT подарок",
+                        parse_mode="HTML"
+                    )
+                except Exception as e:
+                    logger.error(f"Ошибка отправки уведомления админу: {e}")
+            else:
+                # Проигрыш - НЕ ПОКАЗЫВАЕМ РЕЗУЛЬТАТ
+                conn.commit()
+                
+                # Получение баланса
+                cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
+                stars_result = cursor.fetchone()
+                current_stars = stars_result[0] if stars_result else 0
+                
+                # Просто показываем сообщение о том, что подарок использован
+                await callback.message.edit_text(
+                    f"<b>🎁 Бесплатный NFT подарок использован</b>\n\n"
+                    f"✨ <b>Твои звёзды:</b> {current_stars}\n"
+                    f"🕐 <b>Следующий бесплатный NFT подарок через 24 часа</b>\n\n"
+                    f"<i>Попробуй ещё раз через 24 часа!</i>",
+                    reply_markup=get_main_menu_keyboard(user_id),
+                    parse_mode="HTML"
+                )
 
         await callback.answer()
 
@@ -532,15 +540,12 @@ async def free_nft_gift(callback: types.CallbackQuery):
 async def gifts_section(callback: types.CallbackQuery):
     user_id = callback.from_user.id
 
-    # Проверяем баланс
     cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
     result = cursor.fetchone()
     stars = result[0] if result else 0
 
-    # Создаем клавиатуру с ячейками подарков
     keyboard = InlineKeyboardBuilder()
 
-    # Добавляем ячейки подарков в 3 столбца
     gifts_per_row = 3
     for i in range(0, len(GIFTS_CELLS), gifts_per_row):
         row_gifts = GIFTS_CELLS[i:i+gifts_per_row]
@@ -561,7 +566,7 @@ async def gifts_section(callback: types.CallbackQuery):
         f"🎰 <b>Правила игры:</b>\n"
         f"• Выберите ячейку с подарком\n"
         f"• Стоимость: указана под каждой ячейкой\n"
-        f"• Шанс выигрыша: 40%\n"  # ИЗМЕНЕНО С 35% НА 40%
+        f"• Шанс выигрыша: 40%\n"
         f"• При выигрыше подарок добавляется в инвентарь\n\n"
         f"💰 <b>Цены за попытку:</b>\n"
         f"💎💎 Алмаз: 45⭐ | 🏆🏆 Кубок: 45⭐\n"
@@ -581,7 +586,6 @@ async def open_gift_cell(callback: types.CallbackQuery):
     username = callback.from_user.username or ""
     gift_name_lower = callback.data.split("_")[3]
 
-    # Находим подарок по имени
     gift = None
     for g in GIFTS_CELLS:
         if g["name"].lower() == gift_name_lower:
@@ -593,7 +597,6 @@ async def open_gift_cell(callback: types.CallbackQuery):
         return
 
     try:
-        # Проверяем баланс
         cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
         result = cursor.fetchone()
 
@@ -607,15 +610,12 @@ async def open_gift_cell(callback: types.CallbackQuery):
             await callback.answer(f"❌ Недостаточно звёзд! Нужно {gift['cost']}⭐", show_alert=True)
             return
 
-        # Вычитаем звезды
         new_stars = stars - gift["cost"]
         cursor.execute('UPDATE users SET stars = ? WHERE user_id = ?', (new_stars, user_id))
 
-        # Определяем выигрыш (реальный шанс 25%, показываем 40%) - ИЗМЕНЕНО С 15% НА 25%
-        is_win = random.random() * 100 < 25  # Реальный шанс 25%
+        is_win = random.random() * 100 < 25
 
         if is_win:
-            # Добавляем подарок в инвентарь
             cursor.execute('''
                 INSERT INTO user_gifts (user_id, gift_name, gift_emoji, gift_value, timestamp) 
                 VALUES (?, ?, ?, ?, ?)
@@ -623,29 +623,25 @@ async def open_gift_cell(callback: types.CallbackQuery):
 
             cursor.execute('UPDATE users SET gifts_won = gifts_won + 1 WHERE user_id = ?', (user_id,))
 
-            # Записываем выигрыш
             cursor.execute('''
                 INSERT INTO wins (user_id, username, prize_type, prize_value, chance, timestamp) 
                 VALUES (?, ?, ?, ?, ?, ?)
-            ''', (user_id, username, f"Подарок {gift['name']}", gift["cost"], 40, datetime.now().isoformat()))  # ИЗМЕНЕНО С 35 НА 40
+            ''', (user_id, username, f"Подарок {gift['name']}", gift["cost"], 40, datetime.now().isoformat()))
 
-            # Записываем транзакцию
             cursor.execute('''
                 INSERT INTO transactions (user_id, username, amount, type, timestamp) 
                 VALUES (?, ?, ?, ?, ?)
             ''', (user_id, username, gift["cost"], "gift_win", datetime.now().isoformat()))
 
-            # СООБЩЕНИЕ ПРИ ВЫИГРЫШЕ - УБРАЛ ДУБЛИРОВАНИЕ, ИСПОЛЬЗУЕМ ОДНО СООБЩЕНИЕ
             result_text = (
                 f"🎉 <b>Поздравляем! Вы выиграли:</b>\n"
                 f"{gift['emoji']} <b>{gift['name']}</b>\n"
                 f"💰 <b>Стоимость:</b> {gift['cost']}⭐\n"
-                f"📊 <b>Шанс:</b> 40%\n\n"  # ИЗМЕНЕНО С 35% НА 40%
+                f"📊 <b>Шанс:</b> 40%\n\n"
                 f"🎁 <b>Подарок добавлен в ваш инвентарь!</b>\n"
                 f"✨ <b>Можете вывести его в разделе 'Инвентарь'</b>"
             )
 
-            # Уведомляем админа
             try:
                 await bot.send_message(
                     ADMIN_ID,
@@ -654,7 +650,7 @@ async def open_gift_cell(callback: types.CallbackQuery):
                     f"🆔 ID: {user_id}\n"
                     f"🎁 Приз: {gift['name']}\n"
                     f"💰 Стоимость: {gift['cost']} звезд\n"
-                    f"📊 Шанс: 40%\n"  # ИЗМЕНЕНО С 35% НА 40%
+                    f"📊 Шанс: 40%\n"
                     f"⏰ Время: {datetime.now().strftime('%H:%M %d.%m.%Y')}\n"
                     f"🎯 Тип: Ячейка подарков",
                     parse_mode="HTML"
@@ -662,7 +658,6 @@ async def open_gift_cell(callback: types.CallbackQuery):
             except Exception as e:
                 logger.error(f"Ошибка отправки уведомления админу: {e}")
         else:
-            # Записываем проигрыш
             cursor.execute('''
                 INSERT INTO transactions (user_id, username, amount, type, timestamp) 
                 VALUES (?, ?, ?, ?, ?)
@@ -672,13 +667,12 @@ async def open_gift_cell(callback: types.CallbackQuery):
                 f"😔 <b>К сожалению, не повезло</b>\n"
                 f"🎯 <b>Цель:</b> {gift['emoji']} {gift['name']}\n"
                 f"💰 <b>Стоимость попытки:</b> {gift['cost']}⭐\n"
-                f"📊 <b>Шанс был:</b> 40%\n\n"  # ИЗМЕНЕНО С 35% НА 40%
+                f"📊 <b>Шанс был:</b> 40%\n\n"
                 f"💫 <b>Попробуйте ещё раз!</b>"
             )
 
         conn.commit()
 
-        # Получаем финальный баланс
         cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
         final_stars = cursor.fetchone()[0]
 
@@ -707,7 +701,6 @@ async def inventory(callback: types.CallbackQuery):
     user_id = callback.from_user.id
 
     try:
-        # Получаем активные подарки пользователя
         cursor.execute('''
             SELECT id, gift_emoji, gift_name, gift_value, timestamp 
             FROM user_gifts 
@@ -717,12 +710,10 @@ async def inventory(callback: types.CallbackQuery):
 
         gifts = cursor.fetchall()
 
-        # Получаем NFT пользователя
         cursor.execute('SELECT nft_won FROM users WHERE user_id = ?', (user_id,))
         nft_result = cursor.fetchone()
         nft_count = nft_result[0] if nft_result else 0
 
-        # Создаем клавиатуру для выбора подарка
         keyboard = InlineKeyboardBuilder()
 
         if not gifts and nft_count == 0:
@@ -734,7 +725,6 @@ async def inventory(callback: types.CallbackQuery):
             inventory_text = "<b>🎁 Ваши подарки (нажмите для вывода):</b>\n"
             gift_count = 0
 
-            # Группируем одинаковые подарки
             gift_dict = {}
             for gift in gifts:
                 gift_id, emoji, name, value, timestamp = gift
@@ -746,18 +736,15 @@ async def inventory(callback: types.CallbackQuery):
                     gift_dict[key] = {"emoji": emoji, "name": name, "value": value, "count": 1, "ids": [gift_id]}
                 gift_count += 1
 
-            # Отображаем группированные подарки
             for gift_info in gift_dict.values():
                 if gift_info["count"] > 1:
                     inventory_text += f"{gift_info['emoji']} {gift_info['name']}: {gift_info['value']}⭐ (x{gift_info['count']})\n"
-                    # Кнопка для вывода одного экземпляра подарка (первый ID)
                     keyboard.row(InlineKeyboardButton(
                         text=f"📤 Вывести {gift_info['emoji']} {gift_info['name']} ({gift_info['value']}⭐)",
                         callback_data=f"withdraw_gift_{gift_info['ids'][0]}"
                     ))
                 else:
                     inventory_text += f"{gift_info['emoji']} {gift_info['name']}: {gift_info['value']}⭐\n"
-                    # Кнопка для вывода подарка
                     keyboard.row(InlineKeyboardButton(
                         text=f"📤 Вывести {gift_info['emoji']} {gift_info['name']} ({gift_info['value']}⭐)",
                         callback_data=f"withdraw_gift_{gift_info['ids'][0]}"
@@ -789,7 +776,6 @@ async def withdraw_gift(callback: types.CallbackQuery):
     gift_id = int(callback.data.split("_")[2])
 
     try:
-        # Получаем информацию о подарке
         cursor.execute('''
             SELECT gift_name, gift_emoji, gift_value 
             FROM user_gifts 
@@ -804,10 +790,8 @@ async def withdraw_gift(callback: types.CallbackQuery):
 
         gift_name, gift_emoji, gift_value = gift_info
 
-        # Помечаем подарок как удаленный (изменяем статус)
         cursor.execute('UPDATE user_gifts SET status = "withdrawn" WHERE id = ?', (gift_id,))
 
-        # Создаем заявку на вывод
         cursor.execute('''
             INSERT INTO withdrawal_requests (user_id, username, gift_name, gift_emoji, gift_value, timestamp, support_username)
             VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -815,7 +799,6 @@ async def withdraw_gift(callback: types.CallbackQuery):
 
         conn.commit()
 
-        # Уведомляем пользователя
         await callback.message.edit_text(
             f"<b>✅ Заявка на вывод создана!</b>\n\n"
             f"🎁 <b>Подарок:</b> {gift_emoji} {gift_name}\n"
@@ -828,7 +811,6 @@ async def withdraw_gift(callback: types.CallbackQuery):
             parse_mode="HTML"
         )
 
-        # Уведомляем администратора
         try:
             await bot.send_message(
                 ADMIN_ID,
@@ -883,7 +865,6 @@ async def open_nft_cell(callback: types.CallbackQuery):
     username = callback.from_user.username or ""
     cell_num = int(callback.data.split("_")[3])
 
-    # Находим ячейку
     cell_data = None
     for cell in NFT_CELLS:
         if cell["cell"] == cell_num:
@@ -895,7 +876,6 @@ async def open_nft_cell(callback: types.CallbackQuery):
         return
 
     try:
-        # Проверяем баланс
         cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
         result = cursor.fetchone()
 
@@ -909,28 +889,23 @@ async def open_nft_cell(callback: types.CallbackQuery):
             await callback.answer(f"❌ Недостаточно звёзд! Нужно {cell_data['cost']}⭐", show_alert=True)
             return
 
-        # Вычитаем звезды
         new_stars = stars - cell_data["cost"]
         cursor.execute('UPDATE users SET stars = ?, nft_cells_opened = nft_cells_opened + 1 WHERE user_id = ?', 
                       (new_stars, user_id))
 
-        # Определяем выигрыш
         is_nft_win = random.random() * 100 < cell_data["chance"]
 
         if is_nft_win:
-            # Выиграли NFT (1000 звезд)
             nft_value = 1000
             new_stars += nft_value
             cursor.execute('UPDATE users SET stars = ?, nft_won = nft_won + 1 WHERE user_id = ?', 
                           (new_stars, user_id))
 
-            # Записываем выигрыш
             cursor.execute('''
                 INSERT INTO wins (user_id, username, prize_type, prize_value, chance, timestamp) 
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (user_id, username, "NFT из ячейки", nft_value, cell_data["chance"], datetime.now().isoformat()))
 
-            # Записываем транзакцию
             cursor.execute('''
                 INSERT INTO transactions (user_id, username, amount, type, timestamp) 
                 VALUES (?, ?, ?, ?, ?)
@@ -938,7 +913,6 @@ async def open_nft_cell(callback: types.CallbackQuery):
 
             result_text = f"🎉 <b>Поздравляем! Вы выиграли NFT!</b>\n💎 <b>Выигрыш:</b> {nft_value}⭐\n📊 <b>Шанс:</b> {cell_data['chance']}%"
 
-            # Уведомляем админа
             try:
                 await bot.send_message(
                     ADMIN_ID,
@@ -955,7 +929,6 @@ async def open_nft_cell(callback: types.CallbackQuery):
             except Exception as e:
                 logger.error(f"Ошибка отправки уведомления админу: {e}")
         else:
-            # Не выиграли
             cursor.execute('''
                 INSERT INTO nft_cells (user_id, cell_type, cost, chance, result, timestamp) 
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -965,7 +938,6 @@ async def open_nft_cell(callback: types.CallbackQuery):
 
         conn.commit()
 
-        # Получаем финальный баланс
         cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
         final_stars = cursor.fetchone()[0]
 
@@ -997,7 +969,6 @@ async def deposit_section(callback: types.CallbackQuery):
     user_id = callback.from_user.id
 
     try:
-        # Получаем историю депозитов
         cursor.execute('''
             SELECT amount, status, timestamp 
             FROM deposits 
@@ -1069,7 +1040,7 @@ async def support_section(callback: types.CallbackQuery):
         f"{SUPPORT_USERNAME}\n\n"
         f"💬 <b>Напишите напрямую:</b>\n"
         f"1. Откройте чат с {SUPPORT_USERNAME}\n"
-        f"2. Опишите вашу проблему\n"
+        f"2. Опишите вашу проблемю\n"
         f"3. Приложите скриншоты если нужно\n\n"
         f"⏰ <b>Время ответа:</b> до 24 часов",
         reply_markup=get_main_menu_keyboard(callback.from_user.id),
@@ -1120,7 +1091,6 @@ async def admin_panel(callback: types.CallbackQuery):
         return
 
     try:
-        # Получаем статистику
         cursor.execute('SELECT COUNT(*) FROM users')
         total_users = cursor.fetchone()[0]
 
@@ -1168,7 +1138,6 @@ async def admin_stats(callback: types.CallbackQuery):
         return
 
     try:
-        # Подробная статистика
         cursor.execute('SELECT COUNT(*) FROM users')
         total_users = cursor.fetchone()[0]
 
@@ -1247,20 +1216,15 @@ async def admin_add_stars(callback: types.CallbackQuery):
 
     await callback.answer()
 
-# Обработчик сообщений для добавления звёзд
 @dp.message(F.from_user.id == ADMIN_ID)
 async def handle_admin_stars_message(message: types.Message):
-    # Проверяем, не является ли это командой
     if message.text.startswith('/'):
         return
 
     try:
-        # Пробуем разобрать сообщение как команду добавления звёзд
         parts = message.text.strip().split()
 
         if len(parts) != 2:
-            # Это не команда добавления звёзд, возможно это рассылка
-            # Проверяем, не находится ли пользователь в процессе рассылки
             return
 
         try:
@@ -1270,7 +1234,6 @@ async def handle_admin_stars_message(message: types.Message):
             await message.answer("❌ Неверный формат. Используйте: <code>ID количество</code>", parse_mode="HTML")
             return
 
-        # Проверяем существование пользователя
         cursor.execute('SELECT username, first_name, stars FROM users WHERE user_id = ?', (target_user_id,))
         user_info = cursor.fetchone()
 
@@ -1280,16 +1243,13 @@ async def handle_admin_stars_message(message: types.Message):
 
         username, first_name, current_stars = user_info
 
-        # Проверяем, не уйдет ли баланс в минус
         new_stars = current_stars + stars_amount
         if new_stars < 0:
             await message.answer(f"❌ Нельзя убрать больше звёзд, чем есть у пользователя. Текущий баланс: {current_stars}⭐")
             return
 
-        # Обновляем баланс
         cursor.execute('UPDATE users SET stars = ? WHERE user_id = ?', (new_stars, target_user_id))
 
-        # Записываем транзакцию
         cursor.execute('''
             INSERT INTO transactions (user_id, username, amount, type, timestamp, admin_id) 
             VALUES (?, ?, ?, ?, ?, ?)
@@ -1297,7 +1257,6 @@ async def handle_admin_stars_message(message: types.Message):
 
         conn.commit()
 
-        # Уведомляем администратора
         operation_type = "добавлено" if stars_amount > 0 else "убрано"
         operation_emoji = "➕" if stars_amount > 0 else "➖"
 
@@ -1313,7 +1272,6 @@ async def handle_admin_stars_message(message: types.Message):
             parse_mode="HTML"
         )
 
-        # Уведомляем пользователя
         try:
             await bot.send_message(
                 target_user_id,
@@ -1361,14 +1319,11 @@ async def confirm_broadcast(callback: types.CallbackQuery):
         return
 
     try:
-        # Получаем ID оригинального сообщения
         message_id = int(callback.data.split(":")[1])
 
-        # Получаем оригинальное сообщение
         original_message = await bot.forward_message(ADMIN_ID, ADMIN_ID, message_id)
         broadcast_text = original_message.text
 
-        # Получаем всех пользователей
         cursor.execute('SELECT user_id FROM users')
         users = cursor.fetchall()
 
@@ -1376,17 +1331,14 @@ async def confirm_broadcast(callback: types.CallbackQuery):
         successful = 0
         failed = 0
 
-        # Отправляем сообщение о начале рассылки
         status_message = await callback.message.answer(f"🔄 Начинаю рассылку для {total_users} пользователей...")
 
-        # Рассылаем сообщение всем пользователям
         for user in users:
             user_id = user[0]
             try:
                 await bot.send_message(user_id, broadcast_text, parse_mode="HTML")
                 successful += 1
 
-                # Обновляем статус каждые 10 отправок
                 if successful % 10 == 0:
                     try:
                         await status_message.edit_text(
@@ -1398,14 +1350,12 @@ async def confirm_broadcast(callback: types.CallbackQuery):
                     except:
                         pass
 
-                # Небольшая задержка чтобы не превысить лимиты Telegram
                 await asyncio.sleep(0.1)
 
             except Exception as e:
                 failed += 1
                 logger.error(f"Ошибка при отправке пользователю {user_id}: {e}")
 
-        # Финальное сообщение о результатах
         await status_message.edit_text(
             f"✅ <b>Рассылка завершена!</b>\n\n"
             f"📊 <b>Результаты:</b>\n"
@@ -1416,7 +1366,6 @@ async def confirm_broadcast(callback: types.CallbackQuery):
             parse_mode="HTML"
         )
 
-        # Возвращаем в админ панель
         keyboard = InlineKeyboardBuilder()
         keyboard.row(InlineKeyboardButton(text="🔙 Назад в админ панель", callback_data="admin_panel"))
 
@@ -1440,7 +1389,6 @@ async def admin_withdrawals(callback: types.CallbackQuery):
         return
 
     try:
-        # Получаем заявки на вывод
         cursor.execute('''
             SELECT id, user_id, username, gift_name, gift_emoji, gift_value, timestamp 
             FROM withdrawal_requests 
@@ -1507,10 +1455,8 @@ async def process_withdrawal(callback: types.CallbackQuery):
     try:
         withdrawal_id = int(callback.data.split(":")[1])
 
-        # Обновляем статус заявки
         cursor.execute('UPDATE withdrawal_requests SET status = "completed" WHERE id = ?', (withdrawal_id,))
 
-        # Получаем информацию о заявке
         cursor.execute('''
             SELECT user_id, username, gift_name, gift_emoji, gift_value 
             FROM withdrawal_requests 
@@ -1522,7 +1468,6 @@ async def process_withdrawal(callback: types.CallbackQuery):
         if withdrawal_info:
             w_user_id, w_username, w_gift_name, w_gift_emoji, w_gift_value = withdrawal_info
 
-            # Уведомляем пользователя
             try:
                 await bot.send_message(
                     w_user_id,
@@ -1538,7 +1483,6 @@ async def process_withdrawal(callback: types.CallbackQuery):
 
         conn.commit()
 
-        # Обновляем список заявок
         await admin_withdrawals(callback)
 
         await callback.answer(f"✅ Заявка #{withdrawal_id} обработана")
@@ -1555,22 +1499,17 @@ async def main():
 
     logger.info("Запуск бота...")
 
-    # Удаляем вебхук (если был)
     await bot.delete_webhook(drop_pending_updates=True)
 
-    # Запускаем поллинг
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     try:
-        # ЗАПУСКАЕМ KEEP-ALIVE СЕРВЕР
         keep_alive()
         logger.info("Keep-alive сервер запущен")
 
-        # ЗАПУСКАЕМ БОТА
         asyncio.run(main())
     except KeyboardInterrupt:
         logger.info("Бот остановлен")
     except Exception as e:
         logger.error(f"Критическая ошибка: {e}")
-
