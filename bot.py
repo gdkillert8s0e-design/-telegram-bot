@@ -159,7 +159,7 @@ def init_db():
     conn.commit()
     logger.info("База данных инициализирована")
 
-# Шансы выигрыша для обычных подарков (изменен шанс NFT на 0.001%)
+# Шансы выигрыша для обычных подарков (УБРАЛ NFT из обычных подарков)
 PRIZE_CHANCES = {
     "1 звезда": 40.0,
     "3 звезды": 25.0,
@@ -168,8 +168,7 @@ PRIZE_CHANCES = {
     "50 звезд": 5.0,
     "100 звезд": 3.0,
     "500 звезд": 1.5,
-    "NFT": 0.001,  # Изменено с 0.001 на 0.001% (реально 0.001)
-    "Проигрыш": 0.499  # Соответственно увеличена вероятность проигрыша
+    "Проигрыш": 0.5  # Убрал NFT, увеличил проигрыш
 }
 
 PRIZE_VALUES = {
@@ -180,7 +179,6 @@ PRIZE_VALUES = {
     "50 звезд": 50,
     "100 звезд": 100,
     "500 звезд": 500,
-    "NFT": 1000,
     "Проигрыш": 0
 }
 
@@ -190,7 +188,7 @@ DAILY_GIFT_CHANCES = {
     "Проигрыш": 99.999  # Добавлен проигрыш для баланса
 }
 
-# Подарки в виде ячеек рулетки
+# Подарки в виде ячеек рулетки (реальные шансы 25%)
 GIFTS_CELLS = [
     {"name": "Алмаз", "emoji": "💎", "cell_emoji": "💎💎", "cost": 45, "chance_display": 40, "chance_real": 25},
     {"name": "Кубок", "emoji": "🏆", "cell_emoji": "🏆🏆", "cost": 45, "chance_display": 40, "chance_real": 25},
@@ -203,11 +201,11 @@ GIFTS_CELLS = [
     {"name": "Мишка", "emoji": "🧸", "cell_emoji": "🧸🧸", "cost": 8, "chance_display": 40, "chance_real": 25}
 ]
 
-# NFT ячейки
+# NFT ячейки - ИЗМЕНЕНЫ ЦЕНЫ И ШАНСЫ
 NFT_CELLS = [
-    {"cell": 1, "cost": 80, "chance": 1.0, "description": "1% шанс"},
-    {"cell": 2, "cost": 100, "chance": 10.0, "description": "10% шанс"},
-    {"cell": 3, "cost": 250, "chance": 45.0, "description": "45% шанс"}
+    {"cell": 1, "cost": 5, "chance_display": 1.0, "chance_real": 1.0, "description": "1% шанс"},
+    {"cell": 2, "cost": 50, "chance_display": 10.0, "chance_real": 8.0, "description": "10% шанс"},
+    {"cell": 3, "cost": 175, "chance_display": 45.0, "chance_real": 30.0, "description": "45% шанс"}
 ]
 
 # Вспомогательная функция для получения клавиатуры главного меню
@@ -266,8 +264,7 @@ async def cmd_start(message: types.Message):
             f"<b>🎁 Добро пожаловать в OneGifts!</b>\n\n"
             f"✨ <b>Твои звёзды:</b> {stars}\n\n"
             f"🎰 <b>Открывай подарочки и получай звёзды!</b>\n"
-            f"🎁 <b>Бесплатный NFT подарок раз в 24 часа!</b>\n"
-            f"💎 <b>Шанс выиграть NFT в обычном подарке!</b>\n\n"
+            f"🎁 <b>Бесплатный NFT подарок раз в 24 часа с шансом 0.001%!</b>\n\n"
             f"💰 <b>Пополнить баланс:</b> нажмите кнопку 'Депозит'\n"
             f"🛟 <b>Нужна помощь?</b> нажмите 'Поддержка'",
             reply_markup=get_main_menu_keyboard(user_id),
@@ -284,7 +281,7 @@ async def cmd_help(message: types.Message):
     help_text = f"""
 <b>🎮 Как играть:</b>
 
-1. <b>🎁 Открыть подарочек</b> - стоит 100 звезд, можно выиграть от 1 до 500 звезд или NFT (шанс 0.001%)
+1. <b>🎁 Открыть подарочек</b> - стоит 100 звезд, можно выиграть от 1 до 500 звезд
 2. <b>🎁 Бесплатный NFT подарок</b> - доступен раз в 24 часа, шанс выиграть NFT 0.001%
 3. <b>🎁 Подарки</b> - рулетка с подарками (40% шанс на выигрыш)
 4. <b>🎒 Инвентарь</b> - посмотреть ваши подарки и NFT
@@ -304,9 +301,9 @@ async def cmd_help(message: types.Message):
 • 🧸🧸 Мишка: 8 звезд
 
 <b>💎 NFT ячейки:</b>
-• Ячейка 1: 80 звезд (1% шанс)
-• Ячейка 2: 100 звезд (10% шанс)
-• Ячейка 3: 250 звезд (45% шанс)
+• Ячейка 1: 5 звезд (1% шанс)
+• Ячейка 2: 50 звезд (10% шанс)
+• Ячейка 3: 175 звезд (45% шанс)
 
 <b>💰 Для депозита:</b>
 Напишите нашему саппорту: {SUPPORT_USERNAME}
@@ -353,20 +350,20 @@ async def open_gift(callback: types.CallbackQuery):
             new_stars += prize_value
             cursor.execute('UPDATE users SET stars = ? WHERE user_id = ?', (new_stars, user_id))
 
-            if prize == "NFT":
-                cursor.execute('UPDATE users SET nft_won = nft_won + 1 WHERE user_id = ?', (user_id,))
-
+            # Запись выигрыша
             cursor.execute('''
                 INSERT INTO wins (user_id, username, prize_type, prize_value, chance, timestamp) 
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (user_id, username, prize, prize_value, PRIZE_CHANCES[prize], datetime.now().isoformat()))
 
+            # Запись транзакции
             cursor.execute('''
                 INSERT INTO transactions (user_id, username, amount, type, timestamp) 
                 VALUES (?, ?, ?, ?, ?)
             ''', (user_id, username, prize_value, "win", datetime.now().isoformat()))
 
-            if prize_value >= 500 or prize == "NFT":
+            # Уведомление админа о большом выигрыше
+            if prize_value >= 500:
                 try:
                     await bot.send_message(
                         ADMIN_ID,
@@ -384,6 +381,7 @@ async def open_gift(callback: types.CallbackQuery):
 
         conn.commit()
 
+        # Отправка результата
         if prize == "Проигрыш":
             await callback.message.edit_text(
                 f"<b>🎁 Результат открытия:</b>\n\n"
@@ -394,14 +392,11 @@ async def open_gift(callback: types.CallbackQuery):
                 parse_mode="HTML"
             )
         else:
-            emoji = "💎" if prize == "NFT" else "⭐"
-            nft_note = "\n\n<i>Если выиграл NFT - админ сам вам отпишет!</i>" if prize == "NFT" else ""
             await callback.message.edit_text(
                 f"<b>🎁 Результат открытия:</b>\n\n"
-                f"{emoji} <b>Поздравляем! Ты выиграл:</b> {prize}\n"
+                f"⭐ <b>Поздравляем! Ты выиграл:</b> {prize}\n"
                 f"📊 <b>Шанс выигрыша:</b> {PRIZE_CHANCES[prize]}%\n\n"
-                f"✨ <b>Твои звёзды:</b> {new_stars}"
-                f"{nft_note}",
+                f"✨ <b>Твои звёзды:</b> {new_stars}",
                 reply_markup=get_main_menu_keyboard(user_id),
                 parse_mode="HTML"
             )
@@ -458,7 +453,7 @@ async def free_nft_gift(callback: types.CallbackQuery):
             if is_nft_win:
                 # Выигрыш NFT
                 prize = "NFT"
-                prize_value = PRIZE_VALUES[prize]
+                prize_value = 1000  # NFT стоит 1000 звезд
                 
                 # Добавляем звезды
                 cursor.execute('UPDATE users SET stars = stars + ?, nft_won = nft_won + 1 WHERE user_id = ?', 
@@ -613,7 +608,7 @@ async def open_gift_cell(callback: types.CallbackQuery):
         new_stars = stars - gift["cost"]
         cursor.execute('UPDATE users SET stars = ? WHERE user_id = ?', (new_stars, user_id))
 
-        is_win = random.random() * 100 < 25
+        is_win = random.random() * 100 < 25  # Реальный шанс 25%
 
         if is_win:
             cursor.execute('''
@@ -701,15 +696,26 @@ async def inventory(callback: types.CallbackQuery):
     user_id = callback.from_user.id
 
     try:
+        # Получаем ВСЕ активные подарки пользователя (не группируем)
         cursor.execute('''
-            SELECT id, gift_emoji, gift_name, gift_value, timestamp 
+            SELECT gift_emoji, gift_name, gift_value 
             FROM user_gifts 
             WHERE user_id = ? AND status = 'active'
-            ORDER BY timestamp DESC
+            ORDER BY gift_name, timestamp DESC
         ''', (user_id,))
 
         gifts = cursor.fetchall()
 
+        # Считаем количество каждого типа подарка
+        gift_counts = {}
+        for emoji, name, value in gifts:
+            key = f"{emoji} {name}"
+            if key in gift_counts:
+                gift_counts[key]["count"] += 1
+            else:
+                gift_counts[key] = {"emoji": emoji, "name": name, "value": value, "count": 1}
+
+        # Получаем NFT пользователя
         cursor.execute('SELECT nft_won FROM users WHERE user_id = ?', (user_id,))
         nft_result = cursor.fetchone()
         nft_count = nft_result[0] if nft_result else 0
@@ -723,35 +729,31 @@ async def inventory(callback: types.CallbackQuery):
             keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu"))
         else:
             inventory_text = "<b>🎁 Ваши подарки (нажмите для вывода):</b>\n"
-            gift_count = 0
+            total_gift_count = len(gifts)
 
-            gift_dict = {}
-            for gift in gifts:
-                gift_id, emoji, name, value, timestamp = gift
-                key = f"{emoji} {name}"
-                if key in gift_dict:
-                    gift_dict[key]["count"] += 1
-                    gift_dict[key]["ids"].append(gift_id)
-                else:
-                    gift_dict[key] = {"emoji": emoji, "name": name, "value": value, "count": 1, "ids": [gift_id]}
-                gift_count += 1
+            # Создаем кнопки для ВСЕХ отдельных подарков
+            cursor.execute('''
+                SELECT id, gift_emoji, gift_name, gift_value 
+                FROM user_gifts 
+                WHERE user_id = ? AND status = 'active'
+                ORDER BY timestamp DESC
+            ''', (user_id,))
 
-            for gift_info in gift_dict.values():
-                if gift_info["count"] > 1:
-                    inventory_text += f"{gift_info['emoji']} {gift_info['name']}: {gift_info['value']}⭐ (x{gift_info['count']})\n"
-                    keyboard.row(InlineKeyboardButton(
-                        text=f"📤 Вывести {gift_info['emoji']} {gift_info['name']} ({gift_info['value']}⭐)",
-                        callback_data=f"withdraw_gift_{gift_info['ids'][0]}"
-                    ))
-                else:
-                    inventory_text += f"{gift_info['emoji']} {gift_info['name']}: {gift_info['value']}⭐\n"
-                    keyboard.row(InlineKeyboardButton(
-                        text=f"📤 Вывести {gift_info['emoji']} {gift_info['name']} ({gift_info['value']}⭐)",
-                        callback_data=f"withdraw_gift_{gift_info['ids'][0]}"
-                    ))
+            all_gifts = cursor.fetchall()
+            
+            # Сначала показываем список с количеством
+            for gift_info in gift_counts.values():
+                inventory_text += f"{gift_info['emoji']} {gift_info['name']}: {gift_info['value']}⭐ (x{gift_info['count']})\n"
+            
+            # Теперь добавляем кнопки для каждого подарка отдельно
+            for gift_id, emoji, name, value in all_gifts:
+                keyboard.row(InlineKeyboardButton(
+                    text=f"📤 Вывести {emoji} {name} ({value}⭐)",
+                    callback_data=f"withdraw_gift_{gift_id}"
+                ))
 
             inventory_text += f"\n<b>💎 Ваши NFT:</b> {nft_count}\n"
-            inventory_text += f"<b>📊 Всего предметов:</b> {gift_count + nft_count}"
+            inventory_text += f"<b>📊 Всего предметов:</b> {total_gift_count + nft_count}"
 
             keyboard.row(InlineKeyboardButton(text="🎁 Ячейки подарков", callback_data="gifts_section"))
             keyboard.row(InlineKeyboardButton(text="💎 NFT ячейки", callback_data="nft_cells"))
@@ -893,7 +895,8 @@ async def open_nft_cell(callback: types.CallbackQuery):
         cursor.execute('UPDATE users SET stars = ?, nft_cells_opened = nft_cells_opened + 1 WHERE user_id = ?', 
                       (new_stars, user_id))
 
-        is_nft_win = random.random() * 100 < cell_data["chance"]
+        # Используем РЕАЛЬНЫЙ шанс (не отображаемый)
+        is_nft_win = random.random() * 100 < cell_data["chance_real"]
 
         if is_nft_win:
             nft_value = 1000
@@ -904,14 +907,14 @@ async def open_nft_cell(callback: types.CallbackQuery):
             cursor.execute('''
                 INSERT INTO wins (user_id, username, prize_type, prize_value, chance, timestamp) 
                 VALUES (?, ?, ?, ?, ?, ?)
-            ''', (user_id, username, "NFT из ячейки", nft_value, cell_data["chance"], datetime.now().isoformat()))
+            ''', (user_id, username, "NFT из ячейки", nft_value, cell_data["chance_display"], datetime.now().isoformat()))
 
             cursor.execute('''
                 INSERT INTO transactions (user_id, username, amount, type, timestamp) 
                 VALUES (?, ?, ?, ?, ?)
             ''', (user_id, username, nft_value, "nft_cell_win", datetime.now().isoformat()))
 
-            result_text = f"🎉 <b>Поздравляем! Вы выиграли NFT!</b>\n💎 <b>Выигрыш:</b> {nft_value}⭐\n📊 <b>Шанс:</b> {cell_data['chance']}%"
+            result_text = f"🎉 <b>Поздравляем! Вы выиграли NFT!</b>\n💎 <b>Выигрыш:</b> {nft_value}⭐\n📊 <b>Шанс:</b> {cell_data['chance_display']}%"
 
             try:
                 await bot.send_message(
@@ -921,7 +924,7 @@ async def open_nft_cell(callback: types.CallbackQuery):
                     f"🆔 ID: {user_id}\n"
                     f"🎁 Приз: NFT\n"
                     f"⭐ Значение: {nft_value} звезд\n"
-                    f"📊 Шанс: {cell_data['chance']}%\n"
+                    f"📊 Шанс: {cell_data['chance_display']}%\n"
                     f"🎯 Ячейка: {cell_num}\n"
                     f"⏰ Время: {datetime.now().strftime('%H:%M %d.%m.%Y')}",
                     parse_mode="HTML"
@@ -932,9 +935,9 @@ async def open_nft_cell(callback: types.CallbackQuery):
             cursor.execute('''
                 INSERT INTO nft_cells (user_id, cell_type, cost, chance, result, timestamp) 
                 VALUES (?, ?, ?, ?, ?, ?)
-            ''', (user_id, cell_num, cell_data["cost"], cell_data["chance"], False, datetime.now().isoformat()))
+            ''', (user_id, cell_num, cell_data["cost"], cell_data["chance_display"], False, datetime.now().isoformat()))
 
-            result_text = f"😔 <b>К сожалению, NFT не выпал</b>\n📊 <b>Шанс был:</b> {cell_data['chance']}%"
+            result_text = f"😔 <b>К сожалению, NFT не выпал</b>\n📊 <b>Шанс был:</b> {cell_data['chance_display']}%"
 
         conn.commit()
 
@@ -1040,7 +1043,7 @@ async def support_section(callback: types.CallbackQuery):
         f"{SUPPORT_USERNAME}\n\n"
         f"💬 <b>Напишите напрямую:</b>\n"
         f"1. Откройте чат с {SUPPORT_USERNAME}\n"
-        f"2. Опишите вашу проблемю\n"
+        f"2. Опишите вашу проблему\n"
         f"3. Приложите скриншоты если нужно\n\n"
         f"⏰ <b>Время ответа:</b> до 24 часов",
         reply_markup=get_main_menu_keyboard(callback.from_user.id),
@@ -1068,7 +1071,7 @@ async def my_stars(callback: types.CallbackQuery):
             f"✨ <b>Звёзды:</b> {stars}\n"
             f"💰 <b>Всего внесено депозитов:</b> {deposit_total}⭐\n\n"
             f"🎁 <b>Для открытия подарочка нужно 100 звёзд</b>\n"
-            f"💎 <b>Каждый подарок даёт шанс выиграть NFT!</b>\n\n"
+            f"💎 <b>Бесплатный NFT подарок с шансом 0.001%!</b>\n\n"
             f"💳 <b>Пополнить баланс:</b> нажмите 'Депозит'",
             reply_markup=get_main_menu_keyboard(user_id),
             parse_mode="HTML"
