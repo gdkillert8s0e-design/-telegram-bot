@@ -159,7 +159,7 @@ def init_db():
     conn.commit()
     logger.info("База данных инициализирована")
 
-# Шансы выигрыша для обычных подарков (стоимость открытия 25 звезд) - ИЗМЕНЕНЫ ШАНСЫ
+# Шансы выигрыша для обычных подарков (стоимость открытия 25 звезд)
 PRIZE_CHANCES = {
     "1 звезда": 40.0,
     "3 звезды": 20.0,
@@ -168,8 +168,8 @@ PRIZE_CHANCES = {
     "50 звезд": 5.0,
     "100 звезд": 3.0,
     "500 звезд": 1.5,
-    "NFT": 0.5,  # Добавил NFT с шансом 0.5%
-    "Проигрыш": 0.0  # Проигрыш рассчитывается автоматически
+    "NFT": 0.5,
+    "Проигрыш": 0.0
 }
 
 # Пересчитываем проигрыш чтобы сумма была 100%
@@ -184,20 +184,20 @@ PRIZE_VALUES = {
     "50 звезд": 50,
     "100 звезд": 100,
     "500 звезд": 500,
-    "NFT": 0,  # NFT не дает звезд, добавляется в инвентарь
+    "NFT": 0,
     "Проигрыш": 0
 }
 
-# Шансы для ежедневного подарка (только NFT с шансом 0.001%)
+# Шансы для ежедневного подарка
 DAILY_GIFT_CHANCES = {
-    "NFT": 0.001,  # Только NFT в ежедневном подарке с шансом 0.001%
-    "Проигрыш": 99.999  # Добавлен проигрыш для баланса
+    "NFT": 0.001,
+    "Проигрыш": 99.999
 }
 
-# Подарки в виде ячеек рулетки (реальные шансы изменены для Алмаза и Кубка)
+# Подарки в виде ячеек рулетки
 GIFTS_CELLS = [
-    {"name": "Алмаз", "emoji": "💎", "cell_emoji": "💎💎", "cost": 45, "chance_display": 40, "chance_real": 30, "sell_price": 20},  # Изменено с 25 на 30%
-    {"name": "Кубок", "emoji": "🏆", "cell_emoji": "🏆🏆", "cost": 45, "chance_display": 40, "chance_real": 30, "sell_price": 20},  # Изменено с 25 на 30%
+    {"name": "Алмаз", "emoji": "💎", "cell_emoji": "💎💎", "cost": 45, "chance_display": 40, "chance_real": 30, "sell_price": 20},
+    {"name": "Кубок", "emoji": "🏆", "cell_emoji": "🏆🏆", "cost": 45, "chance_display": 40, "chance_real": 30, "sell_price": 20},
     {"name": "Ракета", "emoji": "🚀", "cell_emoji": "🚀🚀", "cost": 25, "chance_display": 40, "chance_real": 25, "sell_price": 10},
     {"name": "Шампанское", "emoji": "🍾", "cell_emoji": "🍾🍾", "cost": 25, "chance_display": 40, "chance_real": 25, "sell_price": 10},
     {"name": "Торт", "emoji": "🎂", "cell_emoji": "🎂🎂", "cost": 25, "chance_display": 40, "chance_real": 25, "sell_price": 10},
@@ -207,11 +207,11 @@ GIFTS_CELLS = [
     {"name": "Мишка", "emoji": "🧸", "cell_emoji": "🧸🧸", "cost": 8, "chance_display": 40, "chance_real": 25, "sell_price": 3}
 ]
 
-# NFT ячейки - ИЗМЕНЕНЫ ЦЕНЫ И ШАНСЫ
+# NFT ячейки
 NFT_CELLS = [
     {"cell": 1, "cost": 5, "chance_display": 1.0, "chance_real": 1.0, "description": "1% шанс"},
     {"cell": 2, "cost": 50, "chance_display": 10.0, "chance_real": 8.0, "description": "10% шанс"},
-    {"cell": 3, "cost": 175, "chance_display": 45.0, "chance_real": 25.0, "description": "45% шанс"}  # Изменено с 30 на 25%
+    {"cell": 3, "cost": 175, "chance_display": 45.0, "chance_real": 25.0, "description": "45% шанс"}
 ]
 
 # Вспомогательная функция для получения клавиатуры главного меню
@@ -301,11 +301,11 @@ async def open_gift(callback: types.CallbackQuery):
 
         stars = result[0]
 
-        if stars < 25:  # Изменено с 30 на 25
+        if stars < 25:
             await callback.answer("❌ Недостаточно звёзд! Нужно минимум 25 звёзд для открытия.", show_alert=True)
             return
 
-        new_stars = stars - 25  # Изменено с 30 на 25
+        new_stars = stars - 25
         cursor.execute('UPDATE users SET stars = ?, total_opened = total_opened + 1 WHERE user_id = ?', 
                        (new_stars, user_id))
 
@@ -316,42 +316,35 @@ async def open_gift(callback: types.CallbackQuery):
 
         if prize != "Проигрыш":
             if prize == "NFT":
-                # NFT добавляем в инвентарь как предмет
                 gift_name = "NFT"
                 gift_emoji = "💎"
-                gift_value = 1000  # Стоимость NFT
+                gift_value = 1000
                 
-                # Добавляем NFT в инвентарь
                 cursor.execute('''
                     INSERT INTO user_gifts (user_id, gift_name, gift_emoji, gift_value, timestamp) 
                     VALUES (?, ?, ?, ?, ?)
                 ''', (user_id, gift_name, gift_emoji, gift_value, datetime.now().isoformat()))
                 
-                # Увеличиваем счетчик NFT
                 cursor.execute('UPDATE users SET nft_won = nft_won + 1 WHERE user_id = ?', (user_id,))
                 
                 result_text = f"💎 <b>Поздравляем! Ты выиграл:</b> NFT\n📊 <b>Шанс выигрыша:</b> 0.5%\n\n✨ <b>Твои звёзды:</b> {new_stars}\n\n🎒 <b>NFT добавлен в ваш инвентарь!</b>"
             else:
-                # Обычные призы (звезды)
                 prize_value = PRIZE_VALUES[prize]
                 new_stars += prize_value
                 cursor.execute('UPDATE users SET stars = ? WHERE user_id = ?', (new_stars, user_id))
                 result_text = f"⭐ <b>Поздравляем! Ты выиграл:</b> {prize}\n📊 <b>Шанс выигрыша:</b> {PRIZE_CHANCES[prize]}%\n\n✨ <b>Твои звёзды:</b> {new_stars}"
 
-            # Запись выигрыша
             cursor.execute('''
                 INSERT INTO wins (user_id, username, prize_type, prize_value, chance, timestamp) 
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (user_id, username, prize, prize_value if prize != "NFT" else 1000, PRIZE_CHANCES[prize], datetime.now().isoformat()))
 
-            # Запись транзакции
             if prize != "NFT":
                 cursor.execute('''
                     INSERT INTO transactions (user_id, username, amount, type, timestamp) 
                     VALUES (?, ?, ?, ?, ?)
                 ''', (user_id, username, prize_value, "win", datetime.now().isoformat()))
 
-            # Уведомление админа о большом выигрыше или NFT
             if prize == "NFT" or prize_value >= 500:
                 try:
                     await bot.send_message(
@@ -372,7 +365,6 @@ async def open_gift(callback: types.CallbackQuery):
 
         conn.commit()
 
-        # Отправка результата
         await callback.message.edit_text(
             f"<b>🎁 Результат открытия:</b>\n\n{result_text}",
             reply_markup=get_main_menu_keyboard(user_id),
@@ -416,10 +408,8 @@ async def free_nft_gift(callback: types.CallbackQuery):
                 return
 
         if can_use:
-            # Определяем результат с шансом 0.001%
-            is_nft_win = random.random() * 100 < 0.001  # 0.001% шанс
+            is_nft_win = random.random() * 100 < 0.001
             
-            # Обновляем время последнего использования
             cursor.execute('''
                 UPDATE users 
                 SET free_gift_used = free_gift_used + 1,
@@ -429,32 +419,26 @@ async def free_nft_gift(callback: types.CallbackQuery):
             ''', (now.isoformat(), user_id))
 
             if is_nft_win:
-                # Выигрыш NFT - добавляем в инвентарь как отдельный предмет
                 gift_name = "NFT"
                 gift_emoji = "💎"
-                gift_value = 1000  # Стоимость NFT
+                gift_value = 1000
                 
-                # Добавляем NFT в инвентарь (НЕ добавляем звезды на баланс!)
                 cursor.execute('''
                     INSERT INTO user_gifts (user_id, gift_name, gift_emoji, gift_value, timestamp) 
                     VALUES (?, ?, ?, ?, ?)
                 ''', (user_id, gift_name, gift_emoji, gift_value, now.isoformat()))
                 
-                # Увеличиваем счетчик NFT
                 cursor.execute('UPDATE users SET nft_won = nft_won + 1 WHERE user_id = ?', (user_id,))
 
-                # Получение баланса (без изменения)
                 cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
                 stars_result = cursor.fetchone()
                 current_stars = stars_result[0] if stars_result else 0
 
-                # Запись выигрыша
                 cursor.execute('''
                     INSERT INTO wins (user_id, username, prize_type, prize_value, chance, timestamp) 
                     VALUES (?, ?, ?, ?, ?, ?)
                 ''', (user_id, username, "NFT", gift_value, 0.001, now.isoformat()))
 
-                # Запись транзакции
                 cursor.execute('''
                     INSERT INTO transactions (user_id, username, amount, type, timestamp) 
                     VALUES (?, ?, ?, ?, ?)
@@ -462,7 +446,6 @@ async def free_nft_gift(callback: types.CallbackQuery):
 
                 conn.commit()
 
-                # Отправка результата ТОЛЬКО ПРИ ВЫИГРЫШЕ
                 await callback.message.edit_text(
                     f"<b>🎁 Бесплатный NFT подарок:</b>\n\n"
                     f"💎 <b>Поздравляем! Ты выиграл:</b> NFT\n"
@@ -475,7 +458,6 @@ async def free_nft_gift(callback: types.CallbackQuery):
                     parse_mode="HTML"
                 )
 
-                # Уведомление админа
                 try:
                     await bot.send_message(
                         ADMIN_ID,
@@ -492,15 +474,12 @@ async def free_nft_gift(callback: types.CallbackQuery):
                 except Exception as e:
                     logger.error(f"Ошибка отправки уведомления админу: {e}")
             else:
-                # Проигрыш - НЕ ПОКАЗЫВАЕМ РЕЗУЛЬТАТ
                 conn.commit()
                 
-                # Получение баланса
                 cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
                 stars_result = cursor.fetchone()
                 current_stars = stars_result[0] if stars_result else 0
                 
-                # Просто показываем сообщение о том, что подарок использован
                 await callback.message.edit_text(
                     f"<b>🎁 Бесплатный NFT подарок использован</b>\n\n"
                     f"✨ <b>Твои звёзды:</b> {current_stars}\n"
@@ -538,7 +517,7 @@ async def gifts_section(callback: types.CallbackQuery):
         keyboard.row(*buttons)
 
     keyboard.row(InlineKeyboardButton(text="🎒 Мой инвентарь", callback_data="inventory"))
-    keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu"))
+    keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main"))
 
     await callback.message.edit_text(
         f"<b>🎁 Ячейки подарков</b>\n\n"
@@ -594,7 +573,6 @@ async def open_gift_cell(callback: types.CallbackQuery):
         new_stars = stars - gift["cost"]
         cursor.execute('UPDATE users SET stars = ? WHERE user_id = ?', (new_stars, user_id))
 
-        # Используем реальный шанс (для Алмаза и Кубка 30%, для остальных 25%)
         is_win = random.random() * 100 < gift["chance_real"]
 
         if is_win:
@@ -664,7 +642,7 @@ async def open_gift_cell(callback: types.CallbackQuery):
         keyboard.row(InlineKeyboardButton(text="🎁 Попробовать ещё раз", callback_data=f"open_gift_cell_{gift_name_lower}"))
         keyboard.row(InlineKeyboardButton(text="🎁 Другие подарки", callback_data="gifts_section"))
         keyboard.row(InlineKeyboardButton(text="🎒 Инвентарь", callback_data="inventory"))
-        keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu"))
+        keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main"))
 
         await callback.message.edit_text(
             f"<b>🎰 Результат открытия ячейки:</b>\n\n"
@@ -685,7 +663,6 @@ async def inventory(callback: types.CallbackQuery):
     user_id = callback.from_user.id
 
     try:
-        # Получаем ВСЕ активные подарки пользователя
         cursor.execute('''
             SELECT id, gift_emoji, gift_name, gift_value 
             FROM user_gifts 
@@ -698,7 +675,6 @@ async def inventory(callback: types.CallbackQuery):
 
         gifts = cursor.fetchall()
 
-        # Считаем количество каждого типа подарка
         gift_counts = {}
         nft_count = 0
         
@@ -713,7 +689,6 @@ async def inventory(callback: types.CallbackQuery):
                 else:
                     gift_counts[key] = {"emoji": emoji, "name": name, "value": value, "count": 1, "ids": [gift_id]}
 
-        # Получаем NFT отдельно
         cursor.execute('''
             SELECT id FROM user_gifts 
             WHERE user_id = ? AND status = 'active' AND gift_name = 'NFT'
@@ -729,23 +704,19 @@ async def inventory(callback: types.CallbackQuery):
             inventory_text = "📭 <b>Ваш инвентарь пуст</b>\n\n🎁 <b>Попробуйте ячейки подарков!</b>"
             keyboard.row(InlineKeyboardButton(text="🎁 Ячейки подарков", callback_data="gifts_section"))
             keyboard.row(InlineKeyboardButton(text="💎 NFT ячейки", callback_data="nft_cells"))
-            keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu"))
+            keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main"))
         else:
             inventory_text = "<b>🎁 Ваши подарки (нажмите для вывода или продажи):</b>\n"
             total_gift_count = len(gifts)
 
-            # Показываем обычные подарки с количеством
             for gift_info in gift_counts.values():
                 inventory_text += f"{gift_info['emoji']} {gift_info['name']}: {gift_info['value']}⭐ (x{gift_info['count']})\n"
             
-            # Показываем NFT отдельно
             if nft_count > 0:
                 inventory_text += f"\n💎 <b>NFT:</b> {nft_count} шт. (1000⭐ каждый)\n"
             
-            # Добавляем кнопки для обычных подарков (продажа и вывод)
             for gift_info in gift_counts.values():
                 if gift_info["count"] > 1:
-                    # Для нескольких одинаковых подарков создаем кнопки для каждого
                     for i, gift_id in enumerate(gift_info["ids"], 1):
                         keyboard.row(
                             InlineKeyboardButton(
@@ -758,7 +729,6 @@ async def inventory(callback: types.CallbackQuery):
                             )
                         )
                 else:
-                    # Для одного подарка
                     keyboard.row(
                         InlineKeyboardButton(
                             text=f"💰 Продать {gift_info['emoji']} {gift_info['name']} ({gift_info['value']}⭐)",
@@ -770,7 +740,6 @@ async def inventory(callback: types.CallbackQuery):
                         )
                     )
             
-            # Добавляем кнопки для NFT (только вывод)
             if nft_count > 0:
                 for i, nft_id in enumerate(nft_ids, 1):
                     keyboard.row(
@@ -788,7 +757,7 @@ async def inventory(callback: types.CallbackQuery):
 
             keyboard.row(InlineKeyboardButton(text="🎁 Ячейки подарков", callback_data="gifts_section"))
             keyboard.row(InlineKeyboardButton(text="💎 NFT ячейки", callback_data="nft_cells"))
-            keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu"))
+            keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main"))
 
         await callback.message.edit_text(
             f"<b>🎒 Ваш инвентарь</b>\n\n{inventory_text}",
@@ -802,7 +771,6 @@ async def inventory(callback: types.CallbackQuery):
         logger.error(f"Ошибка при получении инвентаря: {e}")
         await callback.answer("❌ Произошла ошибка.", show_alert=True)
 
-# Новая функция для продажи подарка
 @dp.callback_query(F.data.startswith("sell_gift_"))
 async def sell_gift(callback: types.CallbackQuery):
     user_id = callback.from_user.id
@@ -824,18 +792,14 @@ async def sell_gift(callback: types.CallbackQuery):
 
         gift_name, gift_emoji, gift_value = gift_info
 
-        # Помечаем подарок как проданный
         cursor.execute('UPDATE user_gifts SET status = "sold" WHERE id = ?', (gift_id,))
 
-        # Добавляем звезды на баланс
         cursor.execute('UPDATE users SET stars = stars + ? WHERE user_id = ?', (gift_value, user_id))
 
-        # Получаем новый баланс
         cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
         new_stars_result = cursor.fetchone()
         new_stars = new_stars_result[0] if new_stars_result else gift_value
 
-        # Записываем транзакцию продажи
         cursor.execute('''
             INSERT INTO transactions (user_id, username, amount, type, timestamp) 
             VALUES (?, ?, ?, ?, ?)
@@ -853,7 +817,6 @@ async def sell_gift(callback: types.CallbackQuery):
             parse_mode="HTML"
         )
 
-        # Уведомление админа о продаже NFT
         if gift_name == "NFT":
             try:
                 await bot.send_message(
@@ -951,7 +914,7 @@ async def nft_cells(callback: types.CallbackQuery):
         ))
 
     keyboard.row(InlineKeyboardButton(text="🎒 Мой инвентарь", callback_data="inventory"))
-    keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu"))
+    keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main"))
 
     await callback.message.edit_text(
         "<b>💎 NFT ячейки</b>\n\n"
@@ -999,22 +962,18 @@ async def open_nft_cell(callback: types.CallbackQuery):
         cursor.execute('UPDATE users SET stars = ?, nft_cells_opened = nft_cells_opened + 1 WHERE user_id = ?', 
                       (new_stars, user_id))
 
-        # Используем РЕАЛЬНЫЙ шанс (не отображаемый)
         is_nft_win = random.random() * 100 < cell_data["chance_real"]
 
         if is_nft_win:
-            # Выигрыш NFT - добавляем в инвентарь как отдельный предмет
             gift_name = "NFT"
             gift_emoji = "💎"
-            gift_value = 1000  # Стоимость NFT
+            gift_value = 1000
             
-            # Добавляем NFT в инвентарь (НЕ добавляем звезды на баланс!)
             cursor.execute('''
                 INSERT INTO user_gifts (user_id, gift_name, gift_emoji, gift_value, timestamp) 
                 VALUES (?, ?, ?, ?, ?)
             ''', (user_id, gift_name, gift_emoji, gift_value, datetime.now().isoformat()))
             
-            # Увеличиваем счетчик NFT
             cursor.execute('UPDATE users SET nft_won = nft_won + 1 WHERE user_id = ?', (user_id,))
 
             cursor.execute('''
@@ -1062,7 +1021,7 @@ async def open_nft_cell(callback: types.CallbackQuery):
         keyboard = InlineKeyboardBuilder()
         keyboard.row(InlineKeyboardButton(text="💎 Открыть ещё ячейку", callback_data="nft_cells"))
         keyboard.row(InlineKeyboardButton(text="🎒 Инвентарь", callback_data="inventory"))
-        keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu"))
+        keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main"))
 
         await callback.message.edit_text(
             f"<b>💎 Открытие NFT ячейки {cell_num}</b>\n\n"
@@ -1079,6 +1038,8 @@ async def open_nft_cell(callback: types.CallbackQuery):
     except Exception as e:
         logger.error(f"Ошибка при открытии NFT ячейки: {e}")
         await callback.answer("❌ Произошла ошибка. Попробуйте позже.", show_alert=True)
+
+# ========== ОБРАБОТКА ДЕПОЗИТОВ ==========
 
 @dp.callback_query(F.data == "deposit")
 async def deposit_section(callback: types.CallbackQuery):
@@ -1106,7 +1067,7 @@ async def deposit_section(callback: types.CallbackQuery):
 
         keyboard = InlineKeyboardBuilder()
         keyboard.row(InlineKeyboardButton(text="📤 Создать депозит", callback_data="create_deposit"))
-        keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu"))
+        keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main"))
 
         await callback.message.edit_text(
             f"<b>💰 Депозит</b>\n\n"
@@ -1139,10 +1100,69 @@ async def create_deposit(callback: types.CallbackQuery):
         f"<b>Формат сообщения:</b>\n"
         f"<code>депозит 100</code> - для депозита 100 звезд\n\n"
         f"👤 <b>Саппорт:</b> {SUPPORT_USERNAME}\n"
-        f"⚠️ <b>Только для этого саппорта!</b>",
+        f"⚠️ <b>Только для этого саппорта!</b>\n\n"
+        f"<i>Отправьте мне сообщение в формате: депозит [сумма]</i>",
         parse_mode="HTML"
     )
     await callback.answer()
+
+# Обработчик сообщений для депозита
+@dp.message(F.text.startswith("депозит"))
+async def handle_deposit_message(message: types.Message):
+    user_id = message.from_user.id
+    username = message.from_user.username or ""
+    
+    try:
+        # Извлекаем сумму из сообщения
+        parts = message.text.strip().split()
+        if len(parts) != 2:
+            await message.answer("❌ Неверный формат. Используйте: <code>депозит 100</code>", parse_mode="HTML")
+            return
+        
+        try:
+            amount = int(parts[1])
+            if amount <= 0:
+                await message.answer("❌ Сумма депозита должна быть больше 0")
+                return
+        except ValueError:
+            await message.answer("❌ Неверная сумма. Используйте числа.")
+            return
+        
+        # Записываем депозит в базу
+        cursor.execute('''
+            INSERT INTO deposits (user_id, username, amount, timestamp) 
+            VALUES (?, ?, ?, ?)
+        ''', (user_id, username, amount, datetime.now().isoformat()))
+        
+        conn.commit()
+        
+        await message.answer(
+            f"✅ <b>Заявка на депозит создана!</b>\n\n"
+            f"💰 <b>Сумма:</b> {amount}⭐\n"
+            f"👤 <b>Саппорт:</b> {SUPPORT_USERNAME}\n\n"
+            f"<i>Отправьте {SUPPORT_USERNAME} {amount}⭐ и скриншот подтверждения.</i>\n"
+            f"<i>Администратор проверит и зачислит средства.</i>",
+            parse_mode="HTML"
+        )
+        
+        # Уведомление админа
+        try:
+            await bot.send_message(
+                ADMIN_ID,
+                f"💰 <b>НОВАЯ ЗАЯВКА НА ДЕПОЗИТ!</b>\n\n"
+                f"👤 Пользователь: @{username if username else 'нет'}\n"
+                f"🆔 ID: {user_id}\n"
+                f"💰 Сумма: {amount}⭐\n"
+                f"⏰ Время: {datetime.now().strftime('%H:%M %d.%m.%Y')}\n\n"
+                f"📞 <b>Саппорт для связи:</b> {SUPPORT_USERNAME}",
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.error(f"Ошибка отправки уведомления админу: {e}")
+            
+    except Exception as e:
+        logger.error(f"Ошибка при создании депозита: {e}")
+        await message.answer("❌ Произошла ошибка при создании депозита.")
 
 @dp.callback_query(F.data == "support")
 async def support_section(callback: types.CallbackQuery):
@@ -1196,6 +1216,31 @@ async def my_stars(callback: types.CallbackQuery):
         logger.error(f"Ошибка при получении баланса: {e}")
         await callback.answer("❌ Произошла ошибка.", show_alert=True)
 
+# ========== КНОПКА НАЗАД ==========
+
+@dp.callback_query(F.data == "back_to_main")
+async def back_to_main(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    
+    try:
+        cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
+        result = cursor.fetchone()
+        stars = result[0] if result else 0
+
+        await callback.message.edit_text(
+            f"<b>🎁 Добро пожаловать в Vitcoin gifts!</b>\n\n"
+            f"✨ <b>Твои звёзды:</b> {stars}\n\n"
+            f"🎰 <b>Открывай подарочки за 25 звезд!</b>\n"
+            f"🎁 <b>Бесплатный NFT подарок раз в 24 часа с шансом 0.001%!</b>\n\n"
+            f"💰 <b>Пополнить баланс:</b> нажмите кнопку 'Депозит'\n"
+            f"🛟 <b>Нужна помощь?</b> нажмите 'Поддержка'",
+            reply_markup=get_main_menu_keyboard(user_id),
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при возврате в главное меню: {e}")
+        await callback.answer("❌ Произошла ошибка.", show_alert=True)
+
 # ========== АДМИН ПАНЕЛЬ ==========
 
 @dp.callback_query(F.data == "admin_panel")
@@ -1225,7 +1270,8 @@ async def admin_panel(callback: types.CallbackQuery):
         keyboard.row(InlineKeyboardButton(text="💰 Добавить звёзды", callback_data="admin_add_stars"))
         keyboard.row(InlineKeyboardButton(text="📢 Рассылка", callback_data="admin_broadcast"))
         keyboard.row(InlineKeyboardButton(text="📤 Заявки на вывод", callback_data="admin_withdrawals"))
-        keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="main_menu"))
+        keyboard.row(InlineKeyboardButton(text="💳 Заявки на депозит", callback_data="admin_deposits"))
+        keyboard.row(InlineKeyboardButton(text="🔙 Назад", callback_data="back_to_main"))
 
         await callback.message.edit_text(
             f"<b>👑 Админ панель</b>\n\n"
@@ -1244,6 +1290,431 @@ async def admin_panel(callback: types.CallbackQuery):
     except Exception as e:
         logger.error(f"Ошибка в админ панели: {e}")
         await callback.answer("❌ Произошла ошибка", show_alert=True)
+
+@dp.callback_query(F.data == "admin_stats")
+async def admin_stats(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+
+    if user_id != ADMIN_ID:
+        await callback.answer("❌ У вас нет доступа", show_alert=True)
+        return
+
+    try:
+        cursor.execute('SELECT COUNT(*) FROM users')
+        total_users = cursor.fetchone()[0]
+
+        cursor.execute('SELECT COUNT(*) FROM users WHERE DATE(registered_date) = DATE("now")')
+        new_users_today = cursor.fetchone()[0]
+
+        cursor.execute('SELECT SUM(stars) FROM users')
+        total_stars_result = cursor.fetchone()[0]
+        total_stars = total_stars_result if total_stars_result else 0
+
+        cursor.execute('SELECT COUNT(*) FROM wins')
+        total_wins = cursor.fetchone()[0]
+
+        cursor.execute('SELECT COUNT(*) FROM wins WHERE prize_type = "NFT"')
+        nft_wins = cursor.fetchone()[0]
+
+        cursor.execute('SELECT COUNT(*) FROM transactions WHERE type = "deposit"')
+        total_deposits = cursor.fetchone()[0]
+
+        cursor.execute('SELECT SUM(amount) FROM deposits WHERE status = "completed"')
+        total_deposited_result = cursor.fetchone()[0]
+        total_deposited = total_deposited_result if total_deposited_result else 0
+
+        cursor.execute('SELECT COUNT(*) FROM withdrawal_requests')
+        total_withdrawals = cursor.fetchone()[0]
+
+        cursor.execute('SELECT COUNT(*) FROM withdrawal_requests WHERE status = "pending"')
+        pending_withdrawals = cursor.fetchone()[0]
+
+        cursor.execute('SELECT COUNT(*) FROM deposits WHERE status = "pending"')
+        pending_deposits = cursor.fetchone()[0]
+
+        keyboard = InlineKeyboardBuilder()
+        keyboard.row(InlineKeyboardButton(text="🔙 Назад в админ панель", callback_data="admin_panel"))
+
+        await callback.message.edit_text(
+            f"<b>📊 Подробная статистика</b>\n\n"
+            f"<b>👥 Пользователи:</b>\n"
+            f"• Всего: {total_users}\n"
+            f"• Новых сегодня: {new_users_today}\n\n"
+            f"<b>💰 Финансы:</b>\n"
+            f"• Всего звёзд: {total_stars}⭐\n"
+            f"• Всего депозитов: {total_deposits}\n"
+            f"• Сумма депозитов: {total_deposited}⭐\n"
+            f"• Ожидают депозиты: {pending_deposits}\n\n"
+            f"<b>🎁 Активность:</b>\n"
+            f"• Всего выигрышей: {total_wins}\n"
+            f"• NFT выиграно: {nft_wins}\n\n"
+            f"<b>📤 Выводы:</b>\n"
+            f"• Всего заявок: {total_withdrawals}\n"
+            f"• Ожидают обработки: {pending_withdrawals}",
+            reply_markup=keyboard.as_markup(),
+            parse_mode="HTML"
+        )
+
+        await callback.answer()
+
+    except Exception as e:
+        logger.error(f"Ошибка при получении статистики: {e}")
+        await callback.answer("❌ Произошла ошибка", show_alert=True)
+
+@dp.callback_query(F.data == "admin_add_stars")
+async def admin_add_stars(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+
+    if user_id != ADMIN_ID:
+        await callback.answer("❌ У вас нет доступа", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        "<b>💰 Добавление звёзд пользователю</b>\n\n"
+        "<b>Отправьте сообщение в формате:</b>\n"
+        "<code>ID_пользователя количество_звёзд</code>\n\n"
+        "<i>Примеры:</i>\n"
+        "<code>123456789 100</code> - добавить 100⭐ пользователю с ID 123456789\n"
+        "<code>987654321 -50</code> - убрать 50⭐ у пользователя с ID 987654321\n\n"
+        "<b>⚠️ Внимание:</b> Можно указывать отрицательные числа для снятия звёзд.",
+        parse_mode="HTML"
+    )
+
+    await callback.answer()
+
+@dp.callback_query(F.data == "admin_broadcast")
+async def admin_broadcast(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+
+    if user_id != ADMIN_ID:
+        await callback.answer("❌ У вас нет доступа", show_alert=True)
+        return
+
+    await callback.message.edit_text(
+        "<b>📢 Рассылка сообщений</b>\n\n"
+        "<b>Отправьте сообщение для рассылки всем пользователям:</b>\n\n"
+        "<i>Формат:</i>\n"
+        "Текст сообщения (поддерживается HTML разметка)\n\n"
+        "<i>Пример:</i>\n"
+        "<code>🔥 Новый конкурс! 🎁\n\nВыиграй 1000⭐! Подробности у @ownsuicude</code>\n\n"
+        "<b>⚠️ Внимание:</b> Рассылка будет отправлена всем пользователям бота.",
+        parse_mode="HTML"
+    )
+
+    await callback.answer()
+
+@dp.callback_query(F.data == "admin_withdrawals")
+async def admin_withdrawals(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+
+    if user_id != ADMIN_ID:
+        await callback.answer("❌ У вас нет доступа", show_alert=True)
+        return
+
+    try:
+        cursor.execute('''
+            SELECT id, user_id, username, gift_name, gift_emoji, gift_value, timestamp 
+            FROM withdrawal_requests 
+            WHERE status = 'pending'
+            ORDER BY timestamp DESC
+            LIMIT 20
+        ''')
+
+        withdrawals = cursor.fetchall()
+
+        if not withdrawals:
+            keyboard = InlineKeyboardBuilder()
+            keyboard.row(InlineKeyboardButton(text="🔙 Назад в админ панель", callback_data="admin_panel"))
+
+            await callback.message.edit_text(
+                "<b>📤 Заявки на вывод</b>\n\n"
+                "✅ Нет ожидающих заявок на вывод.",
+                reply_markup=keyboard.as_markup(),
+                parse_mode="HTML"
+            )
+            return
+
+        withdrawals_text = "<b>📤 Ожидающие заявки на вывод:</b>\n\n"
+
+        keyboard = InlineKeyboardBuilder()
+
+        for withdrawal in withdrawals:
+            w_id, w_user_id, w_username, w_gift_name, w_gift_emoji, w_gift_value, w_timestamp = withdrawal
+            w_time = datetime.fromisoformat(w_timestamp).strftime('%d.%m %H:%M')
+
+            withdrawals_text += f"<b>Заявка #{w_id}</b>\n"
+            withdrawals_text += f"👤 @{w_username if w_username else 'нет'} (ID: {w_user_id})\n"
+            withdrawals_text += f"🎁 {w_gift_emoji} {w_gift_name} ({w_gift_value}⭐)\n"
+            withdrawals_text += f"⏰ {w_time}\n"
+            withdrawals_text += f"📞 Саппорт: {SUPPORT_USERNAME}\n\n"
+
+            keyboard.row(InlineKeyboardButton(
+                text=f"✅ Обработать #{w_id}",
+                callback_data=f"process_withdrawal:{w_id}"
+            ))
+
+        keyboard.row(InlineKeyboardButton(text="🔙 Назад в админ панель", callback_data="admin_panel"))
+
+        await callback.message.edit_text(
+            withdrawals_text,
+            reply_markup=keyboard.as_markup(),
+            parse_mode="HTML"
+        )
+
+        await callback.answer()
+
+    except Exception as e:
+        logger.error(f"Ошибка при получении заявок: {e}")
+        await callback.answer("❌ Произошла ошибка", show_alert=True)
+
+@dp.callback_query(F.data == "admin_deposits")
+async def admin_deposits(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+
+    if user_id != ADMIN_ID:
+        await callback.answer("❌ У вас нет доступа", show_alert=True)
+        return
+
+    try:
+        cursor.execute('''
+            SELECT id, user_id, username, amount, timestamp 
+            FROM deposits 
+            WHERE status = 'pending'
+            ORDER BY timestamp DESC
+            LIMIT 20
+        ''')
+
+        deposits = cursor.fetchall()
+
+        if not deposits:
+            keyboard = InlineKeyboardBuilder()
+            keyboard.row(InlineKeyboardButton(text="🔙 Назад в админ панель", callback_data="admin_panel"))
+
+            await callback.message.edit_text(
+                "<b>💳 Заявки на депозит</b>\n\n"
+                "✅ Нет ожидающих заявок на депозит.",
+                reply_markup=keyboard.as_markup(),
+                parse_mode="HTML"
+            )
+            return
+
+        deposits_text = "<b>💳 Ожидающие заявки на депозит:</b>\n\n"
+
+        keyboard = InlineKeyboardBuilder()
+
+        for deposit in deposits:
+            d_id, d_user_id, d_username, d_amount, d_timestamp = deposit
+            d_time = datetime.fromisoformat(d_timestamp).strftime('%d.%m %H:%M')
+
+            deposits_text += f"<b>Заявка #{d_id}</b>\n"
+            deposits_text += f"👤 @{d_username if d_username else 'нет'} (ID: {d_user_id})\n"
+            deposits_text += f"💰 Сумма: {d_amount}⭐\n"
+            deposits_text += f"⏰ {d_time}\n\n"
+
+            keyboard.row(InlineKeyboardButton(
+                text=f"✅ Подтвердить #{d_id}",
+                callback_data=f"process_deposit:{d_id}"
+            ))
+
+        keyboard.row(InlineKeyboardButton(text="🔙 Назад в админ панель", callback_data="admin_panel"))
+
+        await callback.message.edit_text(
+            deposits_text,
+            reply_markup=keyboard.as_markup(),
+            parse_mode="HTML"
+        )
+
+        await callback.answer()
+
+    except Exception as e:
+        logger.error(f"Ошибка при получении заявок на депозит: {e}")
+        await callback.answer("❌ Произошла ошибка", show_alert=True)
+
+@dp.callback_query(F.data.startswith("process_withdrawal:"))
+async def process_withdrawal(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+
+    if user_id != ADMIN_ID:
+        await callback.answer("❌ У вас нет доступа", show_alert=True)
+        return
+
+    try:
+        withdrawal_id = int(callback.data.split(":")[1])
+
+        cursor.execute('UPDATE withdrawal_requests SET status = "completed" WHERE id = ?', (withdrawal_id,))
+
+        cursor.execute('''
+            SELECT user_id, username, gift_name, gift_emoji, gift_value 
+            FROM withdrawal_requests 
+            WHERE id = ?
+        ''', (withdrawal_id,))
+
+        withdrawal_info = cursor.fetchone()
+
+        if withdrawal_info:
+            w_user_id, w_username, w_gift_name, w_gift_emoji, w_gift_value = withdrawal_info
+
+            try:
+                await bot.send_message(
+                    w_user_id,
+                    f"✅ <b>Ваша заявка на вывод обработана!</b>\n\n"
+                    f"🎁 <b>Подарок:</b> {w_gift_emoji} {w_gift_name}\n"
+                    f"💰 <b>Стоимость:</b> {w_gift_value}⭐\n\n"
+                    f"👤 <b>Свяжитесь с поддержкой:</b> {SUPPORT_USERNAME}\n"
+                    f"<i>для получения вашего подарка.</i>",
+                    parse_mode="HTML"
+                )
+            except Exception as e:
+                logger.error(f"Ошибка при уведомлении пользователя {w_user_id}: {e}")
+
+        conn.commit()
+
+        await admin_withdrawals(callback)
+
+        await callback.answer(f"✅ Заявка #{withdrawal_id} обработана")
+
+    except Exception as e:
+        logger.error(f"Ошибка при обработке заявки: {e}")
+        await callback.answer("❌ Произошла ошибка", show_alert=True)
+
+@dp.callback_query(F.data.startswith("process_deposit:"))
+async def process_deposit(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+
+    if user_id != ADMIN_ID:
+        await callback.answer("❌ У вас нет доступа", show_alert=True)
+        return
+
+    try:
+        deposit_id = int(callback.data.split(":")[1])
+
+        # Получаем информацию о депозите
+        cursor.execute('SELECT user_id, username, amount FROM deposits WHERE id = ?', (deposit_id,))
+        deposit_info = cursor.fetchone()
+
+        if not deposit_info:
+            await callback.answer("❌ Заявка не найдена", show_alert=True)
+            return
+
+        d_user_id, d_username, d_amount = deposit_info
+
+        # Обновляем статус депозита
+        cursor.execute('UPDATE deposits SET status = "completed" WHERE id = ?', (deposit_id,))
+
+        # Добавляем звезды пользователю
+        cursor.execute('UPDATE users SET stars = stars + ?, deposit_total = deposit_total + ? WHERE user_id = ?', 
+                      (d_amount, d_amount, d_user_id))
+
+        # Записываем транзакцию
+        cursor.execute('''
+            INSERT INTO transactions (user_id, username, amount, type, timestamp, admin_id) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (d_user_id, d_username, d_amount, "deposit", datetime.now().isoformat(), ADMIN_ID))
+
+        conn.commit()
+
+        # Уведомляем пользователя
+        try:
+            await bot.send_message(
+                d_user_id,
+                f"✅ <b>Ваш депозит подтвержден!</b>\n\n"
+                f"💰 <b>Сумма:</b> {d_amount}⭐\n"
+                f"✨ <b>Баланс пополнен</b>\n\n"
+                f"<i>Спасибо за использование нашего бота!</i>",
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.error(f"Ошибка при уведомлении пользователя {d_user_id}: {e}")
+
+        await admin_deposits(callback)
+
+        await callback.answer(f"✅ Депозит #{deposit_id} подтвержден")
+
+    except Exception as e:
+        logger.error(f"Ошибка при обработке депозита: {e}")
+        await callback.answer("❌ Произошла ошибка", show_alert=True)
+
+# Обработчик сообщений для админа (добавление звезд)
+@dp.message(F.from_user.id == ADMIN_ID)
+async def handle_admin_message(message: types.Message):
+    # Проверяем, не является ли это командой
+    if message.text.startswith('/'):
+        return
+
+    # Проверяем, не является ли это депозитом
+    if message.text.startswith('депозит'):
+        return  # Пропускаем, это обрабатывается отдельно
+
+    try:
+        # Пробуем разобрать сообщение как команду добавления звёзд
+        parts = message.text.strip().split()
+
+        if len(parts) != 2:
+            # Это не команда добавления звёзд, возможно это рассылка
+            # Пропускаем
+            return
+
+        try:
+            target_user_id = int(parts[0])
+            stars_amount = int(parts[1])
+        except ValueError:
+            await message.answer("❌ Неверный формат. Используйте: <code>ID количество</code>", parse_mode="HTML")
+            return
+
+        cursor.execute('SELECT username, first_name, stars FROM users WHERE user_id = ?', (target_user_id,))
+        user_info = cursor.fetchone()
+
+        if not user_info:
+            await message.answer(f"❌ Пользователь с ID <code>{target_user_id}</code> не найден.", parse_mode="HTML")
+            return
+
+        username, first_name, current_stars = user_info
+
+        new_stars = current_stars + stars_amount
+        if new_stars < 0:
+            await message.answer(f"❌ Нельзя убрать больше звёзд, чем есть у пользователя. Текущий баланс: {current_stars}⭐")
+            return
+
+        cursor.execute('UPDATE users SET stars = ? WHERE user_id = ?', (new_stars, target_user_id))
+
+        cursor.execute('''
+            INSERT INTO transactions (user_id, username, amount, type, timestamp, admin_id) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (target_user_id, username, stars_amount, "admin_add_stars", datetime.now().isoformat(), ADMIN_ID))
+
+        conn.commit()
+
+        operation_type = "добавлено" if stars_amount > 0 else "убрано"
+        operation_emoji = "➕" if stars_amount > 0 else "➖"
+
+        await message.answer(
+            f"{operation_emoji} <b>Баланс обновлен!</b>\n\n"
+            f"👤 <b>Пользователь:</b> @{username if username else 'нет'}\n"
+            f"📛 <b>Имя:</b> {first_name}\n"
+            f"🆔 <b>ID:</b> {target_user_id}\n"
+            f"✨ <b>Было:</b> {current_stars}⭐\n"
+            f"{operation_emoji} <b>{operation_type}:</b> {abs(stars_amount)}⭐\n"
+            f"✨ <b>Стало:</b> {new_stars}⭐\n"
+            f"⏰ <b>Время:</b> {datetime.now().strftime('%H:%M %d.%m.%Y')}",
+            parse_mode="HTML"
+        )
+
+        try:
+            await bot.send_message(
+                target_user_id,
+                f"✨ <b>Ваш баланс обновлен!</b>\n\n"
+                f"{operation_emoji} <b>{operation_type.capitalize()}:</b> {abs(stars_amount)}⭐\n"
+                f"✨ <b>Новый баланс:</b> {new_stars}⭐\n\n"
+                f"<i>Изменение внесено администратором.</i>",
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.error(f"Ошибка при уведомлении пользователя {target_user_id}: {e}")
+            await message.answer("⚠️ Пользователь получил звёзды, но не получил уведомление (возможно заблокировал бота).")
+
+    except Exception as e:
+        logger.error(f"Ошибка при добавлении звёзд: {e}")
+        await message.answer("❌ Произошла ошибка при обработке команды.")
 
 # ========== ЗАПУСК БОТА ==========
 
