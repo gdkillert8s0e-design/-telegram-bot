@@ -40,6 +40,9 @@ logger = logging.getLogger(__name__)
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
+# Флаг для отслеживания состояния рассылки
+broadcast_mode = {}
+
 # Подключение к базе данных
 conn = sqlite3.connect('onegifts.db', check_same_thread=False, isolation_level=None)
 cursor = conn.cursor()
@@ -1460,6 +1463,9 @@ async def admin_broadcast(callback: types.CallbackQuery):
         await callback.answer("❌ У вас нет доступа", show_alert=True)
         return
 
+    # Устанавливаем режим рассылки для этого пользователя
+    broadcast_mode[user_id] = True
+
     await callback.message.edit_text(
         "<b>📢 Рассылка сообщений</b>\n\n"
         "<b>Отправьте сообщение для рассылки всем пользователям:</b>\n\n"
@@ -1467,7 +1473,8 @@ async def admin_broadcast(callback: types.CallbackQuery):
         "Текст сообщения (поддерживается HTML разметка)\n\n"
         "<i>Пример:</i>\n"
         "<code>🔥 Новый конкурс! 🎁\n\nВыиграй 1000⭐! Подробности у @ownsuicude</code>\n\n"
-        "<b>⚠️ Внимание:</b> Рассылка будет отправлена всем пользователям бота.",
+        "<b>⚠️ Внимание:</b> Рассылка будет отправлена всем пользователям бота.\n\n"
+        "<i>Отправьте сейчас сообщение для рассылки. Для отмены нажмите /cancel</i>",
         parse_mode="HTML"
     )
 
@@ -1704,9 +1711,90 @@ async def process_deposit(callback: types.CallbackQuery):
         logger.error(f"Ошибка при обработке депозита: {e}")
         await callback.answer("❌ Произошла ошибка", show_alert=True)
 
-# Обработчик сообщений для админа (добавление звезд)
+# ========== ОБРАБОТЧИК СООБЩЕНИЙ ДЛЯ РАССЫЛКИ ==========
+
 @dp.message(F.from_user.id.in_(ADMIN_IDS))
 async def handle_admin_message(message: types.Message):
+    user_id = message.from_user.id
+    
+    # Проверяем, находится ли администратор в режиме рассылки
+    if user_id in broadcast_mode and broadcast_mode[user_id]:
+        # Отключаем режим рассылки
+        broadcast_mode[user_id] = False
+        
+        # Проверяем, не является ли это командой отмены
+        if message.text == "/cancel":
+            await message.answer("❌ Рассылка отменена.", parse_mode="HTML")
+            return
+        
+        # Получаем текст сообщения
+        broadcast_text = message.text
+        
+        # Отправляем подтверждение
+        await message.answer(
+            f"<b>📢 Начинаю рассылку...</b>\n\n"
+            f"<i>Сообщение:</i>\n"
+            f"{broadcast_text}\n\n"
+            f"<i>Отправляю всем пользователям...</i>",
+            parse_mode="HTML"
+        )
+        
+        try:
+            # Получаем всех пользователей
+            cursor.execute('SELECT user_id, username FROM users')
+            users = cursor.fetchall()
+            
+            total_users = len(users)
+            successful = 0
+            failed = 0
+            
+            # Отправляем сообщение каждому пользователю
+            for user in users:
+                user_id_db, username = user
+                
+                try:
+                    await bot.send_message(
+                        user_id_db,
+                        broadcast_text,
+                        parse_mode="HTML"
+                    )
+                    successful += 1
+                    
+                    # Небольшая задержка, чтобы не превысить лимиты Telegram
+                    await asyncio.sleep(0.05)
+                    
+                except Exception as e:
+                    logger.error(f"Ошибка при отправке сообщения пользователю {user_id_db}: {e}")
+                    failed += 1
+                    
+                    # Если пользователь заблокировал бота, удаляем его из базы
+                    if "bot was blocked" in str(e).lower() or "user is deactivated" in str(e).lower():
+                        try:
+                            cursor.execute('DELETE FROM users WHERE user_id = ?', (user_id_db,))
+                            conn.commit()
+                            logger.info(f"Пользователь {user_id_db} удален из базы (заблокировал бота)")
+                        except Exception as delete_error:
+                            logger.error(f"Ошибка при удалении пользователя {user_id_db}: {delete_error}")
+            
+            # Отправляем отчет администратору
+            await message.answer(
+                f"<b>✅ Рассылка завершена!</b>\n\n"
+                f"📊 <b>Статистика:</b>\n"
+                f"• 👥 Всего пользователей: {total_users}\n"
+                f"• ✅ Успешно отправлено: {successful}\n"
+                f"• ❌ Не удалось отправить: {failed}\n\n"
+                f"<i>Рассылка завершена успешно!</i>",
+                parse_mode="HTML"
+            )
+            
+        except Exception as e:
+            logger.error(f"Ошибка при выполнении рассылки: {e}")
+            await message.answer("❌ Произошла ошибка при выполнении рассылки.", parse_mode="HTML")
+        
+        return
+    
+    # Если не в режиме рассылки, проверяем другие команды админа
+    
     # Проверяем, не является ли это командой
     if message.text.startswith('/'):
         return
@@ -1720,8 +1808,7 @@ async def handle_admin_message(message: types.Message):
         parts = message.text.strip().split()
 
         if len(parts) != 2:
-            # Это не команда добавления звёзд, возможно это рассылка
-            # Пропускаем
+            # Это не команда добавления звёзд
             return
 
         try:
