@@ -36,10 +36,6 @@ SUPPORT_USERNAME = "@ownsuicude"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Инициализация бота и диспетчера
-bot = Bot(token=TOKEN)
-dp = Dispatcher()
-
 # Флаг для отслеживания состояния рассылки
 broadcast_mode = {}
 
@@ -199,15 +195,15 @@ DAILY_GIFT_CHANCES = {
 
 # Подарки в виде ячеек рулетки
 GIFTS_CELLS = [
-    {"name": "Алмаз", "emoji": "💎", "cell_emoji": "💎💎", "cost": 45, "chance_display": 40, "chance_real": 30, "sell_price": 20},
-    {"name": "Кубок", "emoji": "🏆", "cell_emoji": "🏆🏆", "cost": 45, "chance_display": 40, "chance_real": 30, "sell_price": 20},
-    {"name": "Ракета", "emoji": "🚀", "cell_emoji": "🚀🚀", "cost": 25, "chance_display": 40, "chance_real": 25, "sell_price": 10},
-    {"name": "Шампанское", "emoji": "🍾", "cell_emoji": "🍾🍾", "cost": 25, "chance_display": 40, "chance_real": 25, "sell_price": 10},
-    {"name": "Торт", "emoji": "🎂", "cell_emoji": "🎂🎂", "cost": 25, "chance_display": 40, "chance_real": 25, "sell_price": 10},
-    {"name": "Розы", "emoji": "🌹", "cell_emoji": "🌹🌹", "cost": 12, "chance_display": 40, "chance_real": 25, "sell_price": 5},
-    {"name": "Подарок", "emoji": "🎁", "cell_emoji": "🎁🎁", "cost": 12, "chance_display": 40, "chance_real": 25, "sell_price": 5},
-    {"name": "Сердечко", "emoji": "💖", "cell_emoji": "💖💖", "cost": 12, "chance_display": 40, "chance_real": 25, "sell_price": 5},
-    {"name": "Мишка", "emoji": "🧸", "cell_emoji": "🧸🧸", "cost": 8, "chance_display": 40, "chance_real": 25, "sell_price": 3}
+    {"name": "Алмаз", "emoji": "💎", "cell_emoji": "💎💎", "cost": 45, "chance_display": 40, "chance_real": 30, "sell_price": 100},  # Изменено sell_price на 100
+    {"name": "Кубок", "emoji": "🏆", "cell_emoji": "🏆🏆", "cost": 45, "chance_display": 40, "chance_real": 30, "sell_price": 100},  # Изменено sell_price на 100
+    {"name": "Ракета", "emoji": "🚀", "cell_emoji": "🚀🚀", "cost": 25, "chance_display": 40, "chance_real": 25, "sell_price": 50},   # Изменено sell_price на 50
+    {"name": "Шампанское", "emoji": "🍾", "cell_emoji": "🍾🍾", "cost": 25, "chance_display": 40, "chance_real": 25, "sell_price": 50}, # Изменено sell_price на 50
+    {"name": "Торт", "emoji": "🎂", "cell_emoji": "🎂🎂", "cost": 25, "chance_display": 40, "chance_real": 25, "sell_price": 50},      # Изменено sell_price на 50
+    {"name": "Розы", "emoji": "🌹", "cell_emoji": "🌹🌹", "cost": 12, "chance_display": 40, "chance_real": 25, "sell_price": 25},      # Изменено sell_price на 25
+    {"name": "Подарок", "emoji": "🎁", "cell_emoji": "🎁🎁", "cost": 12, "chance_display": 40, "chance_real": 25, "sell_price": 25},   # Изменено sell_price на 25
+    {"name": "Сердечко", "emoji": "💖", "cell_emoji": "💖💖", "cost": 12, "chance_display": 40, "chance_real": 25, "sell_price": 15}, # Изменено sell_price на 15
+    {"name": "Мишка", "emoji": "🧸", "cell_emoji": "🧸🧸", "cost": 8, "chance_display": 40, "chance_real": 25, "sell_price": 15}       # Изменено sell_price на 15
 ]
 
 # NFT ячейки
@@ -308,6 +304,50 @@ async def open_gift(callback: types.CallbackQuery):
             await callback.answer("❌ Недостаточно звёзд! Нужно минимум 25 звёзд для открытия.", show_alert=True)
             return
 
+        # Создаем клавиатуру с кнопками подтверждения
+        keyboard = InlineKeyboardBuilder()
+        keyboard.row(
+            InlineKeyboardButton(text="✅ Да, открыть", callback_data="confirm_open_gift"),
+            InlineKeyboardButton(text="❌ Нет, отмена", callback_data="back_to_main")
+        )
+
+        await callback.message.edit_text(
+            f"<b>🎁 Открытие подарочка</b>\n\n"
+            f"✨ <b>Ваши звёзды:</b> {stars}\n"
+            f"💰 <b>Стоимость открытия:</b> 25⭐\n\n"
+            f"<b>Вы уверены, что хотите открыть подарочек за 25 звезд?</b>\n\n"
+            f"<i>При открытии вы можете выиграть от 1 до 500⭐ или NFT!</i>",
+            reply_markup=keyboard.as_markup(),
+            parse_mode="HTML"
+        )
+
+        await callback.answer()
+
+    except Exception as e:
+        logger.error(f"Ошибка при открытии подарка: {e}")
+        await callback.answer("❌ Произошла ошибка. Попробуйте позже.", show_alert=True)
+
+@dp.callback_query(F.data == "confirm_open_gift")
+async def confirm_open_gift(callback: types.CallbackQuery):
+    user_id = callback.from_user.id
+    username = callback.from_user.username or ""
+
+    logger.info(f"Пользователь {user_id} подтвердил открытие подарка")
+
+    try:
+        cursor.execute('SELECT stars FROM users WHERE user_id = ?', (user_id,))
+        result = cursor.fetchone()
+
+        if not result:
+            await callback.answer("❌ Пользователь не найден.", show_alert=True)
+            return
+
+        stars = result[0]
+
+        if stars < 25:
+            await callback.answer("❌ Недостаточно звёзд! Нужно минимум 25 звёзд для открытия.", show_alert=True)
+            return
+
         new_stars = stars - 25
         cursor.execute('UPDATE users SET stars = ?, total_opened = total_opened + 1 WHERE user_id = ?', 
                        (new_stars, user_id))
@@ -321,7 +361,7 @@ async def open_gift(callback: types.CallbackQuery):
             if prize == "NFT":
                 gift_name = "NFT"
                 gift_emoji = "💎"
-                gift_value = 400  # Изменено с 1000 на 400
+                gift_value = 400
                 
                 cursor.execute('''
                     INSERT INTO user_gifts (user_id, gift_name, gift_emoji, gift_value, timestamp) 
@@ -425,7 +465,7 @@ async def free_nft_gift(callback: types.CallbackQuery):
             if is_nft_win:
                 gift_name = "NFT"
                 gift_emoji = "💎"
-                gift_value = 400  # Изменено с 1000 на 400
+                gift_value = 400
                 
                 cursor.execute('''
                     INSERT INTO user_gifts (user_id, gift_name, gift_emoji, gift_value, timestamp) 
@@ -719,7 +759,7 @@ async def inventory(callback: types.CallbackQuery):
                 inventory_text += f"{gift_info['emoji']} {gift_info['name']}: {gift_info['value']}⭐ (x{gift_info['count']})\n"
             
             if nft_count > 0:
-                inventory_text += f"\n💎 <b>NFT:</b> {nft_count} шт. (400⭐ каждый)\n"  # Изменено с 1000 на 400
+                inventory_text += f"\n💎 <b>NFT:</b> {nft_count} шт. (400⭐ каждый)\n"
             
             for gift_info in gift_counts.values():
                 if gift_info["count"] > 1:
@@ -750,7 +790,7 @@ async def inventory(callback: types.CallbackQuery):
                 for i, nft_id in enumerate(nft_ids, 1):
                     keyboard.row(
                         InlineKeyboardButton(
-                            text=f"💰 Продать 💎 NFT #{i} (400⭐)",  # Изменено с 1000 на 400
+                            text=f"💰 Продать 💎 NFT #{i} (400⭐)",
                             callback_data=f"sell_gift_{nft_id}"
                         ),
                         InlineKeyboardButton(
@@ -975,7 +1015,7 @@ async def open_nft_cell(callback: types.CallbackQuery):
         if is_nft_win:
             gift_name = "NFT"
             gift_emoji = "💎"
-            gift_value = 400  # Изменено с 1000 на 400
+            gift_value = 400
             
             cursor.execute('''
                 INSERT INTO user_gifts (user_id, gift_name, gift_emoji, gift_value, timestamp) 
